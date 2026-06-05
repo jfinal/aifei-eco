@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="always">
+    <meta name="keywords" content="Aifei,任务清单,Just Service,CRUD">
+    <meta name="description" content="Aifei 框架任务清单 CRUD 演示">
+    <title>Aifei Demo 任务清单</title>
+
+    <link rel="icon" href="/assets/icon/favicon.ico">
+    <link rel="stylesheet" href="/assets/css/aifei-demo.css">
+
+    <!-- 开发环境使用 -->
+    <script src="/assets/lib/vue/vue.global-3.5.28.js"></script>
+    <!-- 生产环境使用 -->
+    <!-- <script src="/assets/lib/vue/vue.global.prod-3.5.28.js"></script> -->
+
+    <script src="/assets/js/aifei-demo.js"></script>
+</head>
+
+<body>
+<main id="task-app" class="demo-shell" v-cloak>
+    <section class="task-workspace" aria-labelledby="page-title">
+        <header class="page-header">
+            <div>
+                <p class="eyebrow">Just Service Demo</p>
+                <h1 id="page-title">任务清单</h1>
+            </div>
+            <a class="brand-link" href="https://aifei.cn" target="_blank" rel="noreferrer">aifei.cn</a>
+        </header>
+
+        <form class="task-form" autocomplete="off" @submit.prevent="createTask">
+            <label class="sr-only" for="task-title">任务标题</label>
+            <input id="task-title" name="title" type="text" maxlength="200" placeholder="输入任务标题，按回车键提交" required
+                   v-model.trim="title" :disabled="busy" ref="titleInput">
+            <button type="submit" :disabled="busy">新增</button>
+        </form>
+
+        <div class="list-head">
+            <p class="summary" v-text="summary"></p>
+        </div>
+
+        <ul class="task-list" aria-live="polite">
+            <li v-for="(task, index) in tasks" :key="task.id || index" class="task-item" :class="{ 'is-done': isDone(task.done) }">
+                <input class="task-check" type="checkbox" :id="checkboxId(task, index)" :checked="isDone(task.done)"
+                       @change="updateTask(task, $event.target.checked)">
+                <div class="task-main">
+                    <label class="task-title" :for="checkboxId(task, index)" v-text="task.title || '未命名任务'"></label>
+                    <span class="task-meta" v-text="formatTime(task.created)"></span>
+                </div>
+                <button class="delete-button" type="button" @click="deleteTask(task.id)">删除</button>
+            </li>
+        </ul>
+        <p class="empty-state" v-if="!loading && tasks.length === 0">暂无任务</p>
+        <p class="message" :class="message.type ? 'is-' + message.type : ''" role="status" aria-live="polite" v-text="message.text"></p>
+    </section>
+</main>
+
+<script>
+  const { createApp, ref, reactive, computed, onMounted, nextTick } = Vue;
+  const { get, post } = Aifei.Request;
+
+  // Vue 3 组合式语法实现
+  function setup() {
+    const title = ref("");
+    const tasks = ref([]);
+    const loading = ref(true);
+    const busy = ref(false);
+    const titleInput = ref(null);
+    const message = reactive({
+      text: "",
+      type: ""
+    });
+
+    const summary = computed(() => {
+      if (loading.value) {
+        return "加载中";
+      }
+
+      const doneCount = tasks.value.filter(task => isDone(task.done)).length;
+      return tasks.value.length ? `共 ${tasks.value.length} 项，已完成 ${doneCount} 项` : "共 0 项";
+    });
+
+    function isDone(value) {
+      return value === true || value === 1;
+    }
+
+    function checkboxId(task, index) {
+      return "task-check-" + (task.id || index);
+    }
+
+    function formatTime(value) {
+      return value ? String(value).replace("T", " ") : "";
+    }
+
+    function setMessage(text, type) {
+      message.text = text || "";
+      message.type = type || "";
+    }
+
+    function focusTitleInput() {
+      if (titleInput.value) {
+        titleInput.value.focus();
+      }
+    }
+
+    function loadTasks() {
+      loading.value = true;
+      setMessage("");
+
+      get("/list")
+        .then(list => {
+          tasks.value = Array.isArray(list) ? list : [];
+        })
+        .catch(error => {
+          tasks.value = [];
+          setMessage(error.message || "加载失败，请确认数据库与服务已启动", "error");
+        })
+        .finally(() => {
+          loading.value = false;
+        });
+    }
+
+    function createTask() {
+      if (!title.value) {
+        setMessage("请输入任务标题", "error");
+        focusTitleInput();
+        return;
+      }
+
+      busy.value = true;
+      post("/insert", {
+        title: title.value,
+        done: false
+      })
+        .then(() => {
+          title.value = "";
+          setMessage("插入成功", "ok");
+          loadTasks();
+        })
+        .catch(error => {
+          setMessage(error.message || "插入失败", "error");
+        })
+        .finally(() => {
+          busy.value = false;
+          nextTick(focusTitleInput);
+        });
+    }
+
+    function updateTask(task, done) {
+      post("/update", {
+        id: task.id,
+        title: task.title || "",
+        done: done
+      })
+        .then(() => {
+          setMessage("更新成功", "ok");
+          loadTasks();
+        })
+        .catch(error => {
+          setMessage(error.message || "更新失败", "error");
+          loadTasks();
+        });
+    }
+
+    function deleteTask(id) {
+      post("/delete", {
+        id: id
+      })
+        .then(() => {
+          setMessage("删除成功", "ok");
+          loadTasks();
+        })
+        .catch(error => {
+          setMessage(error.message || "删除失败", "error");
+        });
+    }
+
+    onMounted(loadTasks);
+
+    return {
+      title, tasks, loading, busy, message, titleInput, summary,
+      isDone, checkboxId, formatTime, createTask, updateTask, deleteTask
+    };
+  }
+
+  createApp({ setup }).mount("#task-app");
+</script>
+</body>
+</html>

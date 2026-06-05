@@ -1,0 +1,4 @@
+db 包下面的所有文件均由 Generator.java 生成，无需人工干预
+
+当数据库 table 结构变化，或者新增 table 时，运行 Generator 重新生成文件
+

@@ -1,0 +1,29 @@
+一、启动方式
+
+1：创建名为 aifei_demo 的数据库，字符集使用 UTF8MB4。使用如下命令可以建库
+    mysql -u root -p
+    create database aifei_demo DEFAULT CHARACTER SET UTF8MB4;
+
+2：将 aifei_demo.sql 导入到 aifei_demo 数据库
+
+3：修改 app-config-dev.txt 中访问数据库的账号、密码
+
+4：修改 undertow-dev.txt 中启动参数，默认启动端口号为 80，可改为自己习惯的端口号
+
+5：打开 AifeiDemo.java，右键点击该文件，点击运行即可
+
+6：访问地址： http://localhost
+
+二、打包部署
+   打包: mvn clean package
+
+   部署方式一：target 目录下的 aifei-demo-release.zip 解压即可部署
+
+   部署方式二：target/aifei-demo-release 目录下的 aifei-demo 目录直接复制即可部署
+
+   启动：执行 aifei-demo.sh start 即可启动。windows 下启动 aifei-demo.bat start
+
+   关闭：执行 aifei-demo.sh stop 即可关闭。windows 下关闭 aifei-demo.bat stop
+
+
+

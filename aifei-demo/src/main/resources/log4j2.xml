@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+
+    <!-- 全局属性 -->
+    <Properties>
+        <!-- 日志目录，可按需修改成绝对路径 -->
+        <Property name="LOG_DIR">logs</Property>
+        <!-- 日志主文件名，可根据项目名称进行修改 -->
+        <Property name="FILE_NAME">aifei-demo</Property>
+    </Properties>
+
+    <!-- 配置文档：https://logging.apache.org/log4j/2.x/manual/configuration.html -->
+    <Appenders>
+        <Console name="console">
+            <!-- 包名全量输出 -->
+            <PatternLayout pattern="%highlight{%-5level: %date{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %class}: %msg%throwable%n" charset="UTF-8"/>
+
+            <!-- 包名缩略格式输出，减少输出量 -->
+            <!-- <PatternLayout pattern="%highlight{%-5level: %date{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %class{1.}}: %msg%throwable%n" charset="UTF-8"/> -->
+        </Console>
+
+        <!-- 配置文档： https://logging.apache.org/log4j/2.x/manual/appenders/rolling-file.html
+             文件名以 .gz 结尾自动压缩（可配置为 .zip），配置为 .gz 后缀之后不能再配置 Compress，否则将被压缩两次
+             例：filePattern="log/app/%d{yyyy-MM}/%d{yyyy-MM-dd}-%i.log.gz"
+        -->
+        <RollingFile name="errorLog"
+                     fileName="${LOG_DIR}/${FILE_NAME}.log"
+                     filePattern="${LOG_DIR}/${FILE_NAME}-%d{yyyy-MM-dd}-%i.log.gz">
+
+            <!-- 配置 ThresholdFilter 覆盖 WARN、ERROR、FATAL，屏蔽 INFO、DEBUG、TRACE -->
+            <ThresholdFilter level="WARN" onMatch="ACCEPT" onMismatch="DENY"/>
+
+            <PatternLayout pattern="[%-5level] %date{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %class: %msg%throwable%n" charset="UTF-8"/>
+
+            <Policies>
+                <!-- interval 滚动间隔数（单位由 filePattern 中 %d 配置的最小时间单位决定），默认为 1
+                     maxRandomDelay 最大随机延迟秒数（用于分布式系统错峰滚动），默认为 0
+                     modulate 是否对齐到时间边界（如 0 点），默认为 false
+                 -->
+                <TimeBasedTriggeringPolicy interval="1" maxRandomDelay="30"/>
+                <!-- k, kB, M, MB, G, GB, T, TB。默认 10 MB -->
+                <SizeBasedTriggeringPolicy size="10 MB"/>
+            </Policies>
+
+            <!-- 滚动策略，删除旧文件 -->
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${FILE_NAME}*.log.gz"/>
+                    <!-- age="P30D" 表示自动删除 30 天前的所有日志 -->
+                    <IfLastModified age="P30D"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+
+        </RollingFile>
+
+        <!-- 输出 info 到独立日志文件 -->
+        <RollingFile name="infoLog"
+                     fileName="${LOG_DIR}/${FILE_NAME}-info.log"
+                     filePattern="${LOG_DIR}/${FILE_NAME}-info-%d{yyyy-MM-dd}-%i.log.gz">
+
+            <LevelMatchFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+
+            <PatternLayout pattern="[%-5level] %date{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %class: %msg%throwable%n" charset="UTF-8"/>
+
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" maxRandomDelay="30"/>
+                <SizeBasedTriggeringPolicy size="10 MB"/>
+            </Policies>
+
+            <!-- 保留最近的 30 个文件 -->
+            <DefaultRolloverStrategy max="30"/>
+
+        </RollingFile>
+
+    </Appenders>
+
+    <Loggers>
+        <Root level="INFO">
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="errorLog"/>
+            <AppenderRef ref="infoLog"/>
+        </Root>
+
+        <!-- undertow 内置日志级别改为 WARN，启动时不输出 INFO 日志 -->
+        <Logger name="org.xnio" level="WARN" />
+        <Logger name="io.undertow" level="WARN" />
+        <Logger name="org.jboss.threads" level="WARN" />
+
+        <!--
+           屏蔽 Druid 的 INFO 日志。additivity="false" 阻止日志向上传递给 Root Logger，
+           AppenderRef 指向 errorLog，若不配置 additivity，则在向 errorLog 输出日志后，
+           还会向上找到 Root Logger 向其中的 AppenderRef 所指目标再次输出。
+         -->
+        <Logger name="com.alibaba.druid.pool.DruidDataSource" level="WARN" additivity="false">
+            <AppenderRef ref="errorLog"/>
+        </Logger>
+
+        <!-- 独立配置 com.foo.Bar 的 trace 日志 -->
+        <!-- <Logger name="com.foo.Bar" level="trace" additivity="false"> -->
+        <!--     <AppenderRef ref="console"/> -->
+        <!-- </Logger> -->
+    </Loggers>
+
+</Configuration>
+

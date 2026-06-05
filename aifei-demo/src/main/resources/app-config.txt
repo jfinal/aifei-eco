@@ -1,0 +1,4 @@
+# 设置当前激活的 Profile（如：dev、test、pro）
+aifei.profiles.active = dev
+
+

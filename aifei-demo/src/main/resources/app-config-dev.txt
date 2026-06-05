@@ -1,0 +1,12 @@
+# db config
+jdbcUrl = jdbc:mysql://localhost:3306/aifei_demo?useSSL=false&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull
+user = root
+password = yourPassword
+
+# 打印 action 信息
+printAction = true
+
+# enjoy 引擎支持热加载
+enjoyDevMode = true
+
+
