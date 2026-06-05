@@ -9,7 +9,7 @@ Aifei 是一款用于 AI Coding 的 Java 服务端框架。
 
 # Just Service 范式
 
-前后端分离架构在近十年间已逐步成为主流，服务端 Controller 职能其实早已从后端转移到了前端。前端主流路由库 react-router、vue-router 接管了后端路由职责。
+前后端分离架构在近十年间逐步成为主流。Web 应用中的页面路由、交互编排与渲染职责大量转移到了前端，react-router、vue-router 这样的前端路由库已经接管了过去由服务端 Controller 承担的职责。
 
 路由逻辑转移至前端，促使 Aifei 开创 Just Service 范式。该范式也是 Aifei 成为 AI Coding 框架的关键设计之一。
 
