@@ -42,7 +42,7 @@ public class Serializer {
     /**
      * 反序列化
      */
-    @SuppressWarnings({ "unchecked" })
+    @SuppressWarnings({"unchecked"})
     public static <T> T from(byte[] bytes) {
         try {
             return (T) serializer.valueFromBytes(bytes);
