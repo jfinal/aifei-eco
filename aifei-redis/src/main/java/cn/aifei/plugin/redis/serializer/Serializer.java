@@ -20,14 +20,14 @@ package cn.aifei.plugin.redis.serializer;
  * Serializer.
  */
 public interface Serializer {
-	
+
     byte[] keyToBytes(String key);
     String keyFromBytes(byte[] bytes);
-    
+
     byte[] fieldToBytes(Object field);
     Object fieldFromBytes(byte[] bytes);
-    
-	byte[] valueToBytes(Object value);
+
+    byte[] valueToBytes(Object value);
     Object valueFromBytes(byte[] bytes);
 }
 
