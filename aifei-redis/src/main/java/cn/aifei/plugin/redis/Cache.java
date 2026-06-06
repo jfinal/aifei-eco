@@ -790,14 +790,6 @@ public class Cache {
      * 如果 key 不是列表类型，返回一个错误。
      */
     @SuppressWarnings("unchecked")
-
-    /**
-     * 返回列表 key 中，下标为 index 的元素。
-     * 下标(index)参数 start 和 stop 都以 0 为底，也就是说，以 0 表示列表的第一个元素，
-     * 以 1 表示列表的第二个元素，以此类推。
-     * 你也可以使用负数下标，以 -1 表示列表的最后一个元素， -2 表示列表的倒数第二个元素，以此类推。
-     * 如果 key 不是列表类型，返回一个错误。
-     */
     public <T> T lindex(Object key, long index) {
         Jedis jedis = getJedis();
         try {
