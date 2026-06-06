@@ -24,13 +24,13 @@ package cn.aifei.plugin.redis;
  */
 @FunctionalInterface
 public interface KeyNamingPolicy {
-	
-	String getKeyName(Object key);
-	
-	KeyNamingPolicy defaultKeyNamingPolicy = new KeyNamingPolicy() {
-		public String getKeyName(Object key) {
-			return key.toString();
-		}
-	};
+
+    String getKeyName(Object key);
+
+    KeyNamingPolicy defaultKeyNamingPolicy = new KeyNamingPolicy() {
+        public String getKeyName(Object key) {
+            return key.toString();
+        }
+    };
 }
 
