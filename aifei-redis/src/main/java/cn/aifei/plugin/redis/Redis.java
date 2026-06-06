@@ -122,8 +122,7 @@ public class Redis {
         }
         try {
             return callback.call(cache);
-        }
-        finally {
+        } finally {
             if (notThreadLocalJedis) {
                 cache.removeThreadLocalJedis();
                 jedis.close();
