@@ -22,12 +22,12 @@ import cn.aifei.plugin.redis.serializer.FurySerializer;
  * Serializer 用于 Redis.call(...)、Redis.use().call(...) 对数据进行序列化与反序列化
  */
 public class Serializer {
-    
+
     /*
      * 与 RedisPlugin.setSerializer(...) 同步持有序列化策略类
      */
     static cn.aifei.plugin.redis.serializer.Serializer serializer = FurySerializer.me;
-    
+
     /**
      * 序列化
      */
@@ -38,7 +38,7 @@ public class Serializer {
             throw new RuntimeException(e);
         }
     }
-    
+
     /**
      * 反序列化
      */
