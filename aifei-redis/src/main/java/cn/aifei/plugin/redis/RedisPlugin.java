@@ -17,12 +17,12 @@
 package cn.aifei.plugin.redis;
 
 import cn.aifei.plugin.Plugin;
+import cn.aifei.plugin.redis.serializer.FurySerializer;
 import cn.aifei.util.StrUtil;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.Protocol;
 import java.util.function.Consumer;
-import cn.aifei.plugin.redis.serializer.FstSerializer;
 import cn.aifei.plugin.redis.serializer.Serializer;
 
 /**
@@ -120,7 +120,7 @@ public class RedisPlugin implements Plugin {
         }
 
         if (serializer == null) {
-            serializer = FstSerializer.me;
+            serializer = FurySerializer.me;
         }
         if (keyNamingPolicy == null) {
             keyNamingPolicy = KeyNamingPolicy.defaultKeyNamingPolicy;
