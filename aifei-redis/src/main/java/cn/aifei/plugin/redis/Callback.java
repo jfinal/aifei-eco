@@ -23,7 +23,7 @@ package cn.aifei.plugin.redis;
  */
 @FunctionalInterface
 public interface Callback<T> {
-	T call(Cache cache);
+    T call(Cache cache);
 }
 
 
