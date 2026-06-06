@@ -73,7 +73,7 @@ public class RedisPlugin implements Plugin {
         this(cacheName, host, port, timeout);
         // 当 password 未指定时 jedis 底层不进行 auth 也可以进行操作
         // if (StrUtil.isBlank(password)) {
-        // 	throw new IllegalArgumentException("password can not be blank.");
+        //     throw new IllegalArgumentException("password can not be blank.");
         // }
         this.password = password;
     }
@@ -111,8 +111,8 @@ public class RedisPlugin implements Plugin {
             jedisPool = new JedisPool(jedisPoolConfig, host, port, timeout, password, database);
         } else if (port != null && timeout != null) {
             jedisPool = new JedisPool(jedisPoolConfig, host, port, timeout, password);
-            // } else if (port != null && timeout != null) {
-            // 	jedisPool = new JedisPool(jedisPoolConfig, host, port, timeout);
+        // } else if (port != null && timeout != null) {
+        //     jedisPool = new JedisPool(jedisPoolConfig, host, port, timeout);
         } else if (port != null) {
             jedisPool = new JedisPool(jedisPoolConfig, host, port);
         } else {
