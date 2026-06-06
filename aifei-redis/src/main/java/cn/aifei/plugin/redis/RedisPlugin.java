@@ -172,7 +172,7 @@ public class RedisPlugin implements Plugin {
 
     public void setSerializer(Serializer serializer) {
         this.serializer = serializer;
-        cn.aifei.plugin.redis.Serializer.serializer = serializer;
+        SerializerUtil.serializer = serializer;
     }
 
     public void setKeyNamingPolicy(KeyNamingPolicy keyNamingPolicy) {

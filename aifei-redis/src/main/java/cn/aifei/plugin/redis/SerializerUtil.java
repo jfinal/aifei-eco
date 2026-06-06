@@ -17,16 +17,17 @@
 package cn.aifei.plugin.redis;
 
 import cn.aifei.plugin.redis.serializer.FurySerializer;
+import cn.aifei.plugin.redis.serializer.Serializer;
 
 /**
  * Serializer 用于 Redis.call(...)、Redis.use().call(...) 对数据进行序列化与反序列化
  */
-public class Serializer {
+public class SerializerUtil {
 
     /*
      * 与 RedisPlugin.setSerializer(...) 同步持有序列化策略类
      */
-    static cn.aifei.plugin.redis.serializer.Serializer serializer = FurySerializer.me;
+    static Serializer serializer = FurySerializer.me;
 
     /**
      * 序列化
