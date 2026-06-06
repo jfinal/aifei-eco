@@ -105,14 +105,14 @@ public class RedisPlugin implements Plugin {
         }
 
         JedisPool jedisPool;
-        if      (port != null && timeout != null && database != null && clientName != null) {
+        if (port != null && timeout != null && database != null && clientName != null) {
             jedisPool = new JedisPool(jedisPoolConfig, host, port, timeout, password, database, clientName);
         } else if (port != null && timeout != null && database != null) {
             jedisPool = new JedisPool(jedisPoolConfig, host, port, timeout, password, database);
         } else if (port != null && timeout != null) {
             jedisPool = new JedisPool(jedisPoolConfig, host, port, timeout, password);
-        // } else if (port != null && timeout != null) {
-        // 	jedisPool = new JedisPool(jedisPoolConfig, host, port, timeout);
+            // } else if (port != null && timeout != null) {
+            // 	jedisPool = new JedisPool(jedisPoolConfig, host, port, timeout);
         } else if (port != null) {
             jedisPool = new JedisPool(jedisPoolConfig, host, port);
         } else {
