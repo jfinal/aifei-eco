@@ -27,7 +27,7 @@ public interface KeyNamingPolicy {
 	
 	String getKeyName(Object key);
 	
-	static final KeyNamingPolicy defaultKeyNamingPolicy = new KeyNamingPolicy() {
+	KeyNamingPolicy defaultKeyNamingPolicy = new KeyNamingPolicy() {
 		public String getKeyName(Object key) {
 			return key.toString();
 		}
