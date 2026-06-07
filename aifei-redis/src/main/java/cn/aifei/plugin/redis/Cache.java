@@ -1666,7 +1666,7 @@ public class Cache {
      *
      * <pre>
      * 例子：
-     * String lockId = Redis.use().lock("lock:stock", 120, 5.0);
+     * String lockId = Redis.use().tryLock("lock:stock", 120, 5.0);
      * if (lockId != null) {
      *     try {
      *        业务操作代码
@@ -1681,7 +1681,7 @@ public class Cache {
      * @param waitSeconds 获取锁的最长等待时间，单位秒，支持小数，如：3.5
      * @return 获取锁成功则返回 lockId，否则返回 null。释放锁方法 unlock 必须传入正确的 lockId
      */
-    public String lock(String lockKey, int leaseSeconds, double waitSeconds) {
+    public String tryLock(String lockKey, int leaseSeconds, double waitSeconds) {
         Jedis jedis = getJedis();
         try {
             String lockId = java.util.UUID.randomUUID().toString();
@@ -1690,6 +1690,9 @@ public class Cache {
             do {
                 if ("OK".equals(jedis.set(lockKey, lockId, setParams))) {
                     return lockId;
+                }
+                if (System.currentTimeMillis() - startTime >= waitSeconds * 1000) {
+                    return null;
                 }
                 try {
                     Thread.sleep(50);
@@ -1705,9 +1708,16 @@ public class Cache {
     }
 
     /**
+     * 尝试获取锁，获取失败立即返回 null
+     */
+    public String tryLock(String lockKey, int leaseSeconds) {
+        return tryLock(lockKey, leaseSeconds, 0);
+    }
+
+    /**
      * 释放锁
      * @param lockKey 锁的 key，与业务逻辑相关
-     * @param lockId 调用 lock(...) 方法成功获取锁时得到的返回值
+     * @param lockId 调用 tryLock(...) 方法成功获取锁时得到的返回值
      */
     public void unlock(String lockKey, String lockId) {
         Jedis jedis = getJedis();
@@ -1727,7 +1737,7 @@ public class Cache {
      * 为业务封装分布式锁，免去锁的获取、释放。在某些超长执行时间的业务中，锁的获取与释放间隔很长，所以锁的获取与释放不要共用同一个 jedis 连接
      * <pre>
      * 例子：
-     * Redis.use().tryRunWithLock("lock:stock", 120, 5.0, () -> {
+     * Redis.use().tryExecuteWithLock("lock:stock", 120, 5.0, () -> {
      *     // 业务代码
      * });
      *</pre>
@@ -1737,8 +1747,8 @@ public class Cache {
      * @param action 获取锁成功之后被回调的业务逻辑
      * @return 获取锁成功则返回 true，否则返回 false
      */
-    public boolean tryRunWithLock(String lockKey, int leaseSeconds, double waitSeconds, Runnable action) {
-        String lockId = lock(lockKey, leaseSeconds, waitSeconds);
+    public boolean tryExecuteWithLock(String lockKey, int leaseSeconds, double waitSeconds, Runnable action) {
+        String lockId = tryLock(lockKey, leaseSeconds, waitSeconds);
         if (lockId == null) {
             return false;
         }
@@ -1748,6 +1758,13 @@ public class Cache {
         } finally {
             unlock(lockKey, lockId);
         }
+    }
+
+    /**
+     * 尝试获取锁并执行业务逻辑，获取锁失败立即返回 false
+     */
+    public boolean tryExecuteWithLock(String lockKey, int leaseSeconds, Runnable action) {
+        return tryExecuteWithLock(lockKey, leaseSeconds, 0, action);
     }
 
     /**
