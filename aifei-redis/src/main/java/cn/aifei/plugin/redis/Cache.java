@@ -1666,7 +1666,7 @@ public class Cache {
      *
      * <pre>
      * 例子：
-     * String lockId = Redis.use().tryLock("lock:stock", 120, 5.0);
+     * String lockId = Redis.use().tryLock("lock:stock", 120, 3.5);
      * if (lockId != null) {
      *     try {
      *        业务操作代码
