@@ -4,6 +4,6 @@
 
 ## 模块
 
-- `aifei-demo`: aifei 的独立 Maven 演示项目。
 - `aifei-doc`: aifei 的文档。
-
+- `aifei-demo`: aifei 的独立 Maven 演示项目。
+- `aifei-redis`: aifei 的 redis 插件。
