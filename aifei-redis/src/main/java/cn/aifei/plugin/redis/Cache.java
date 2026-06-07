@@ -1726,35 +1726,27 @@ public class Cache {
      * 为业务封装分布式锁，免去锁的获取、释放。在某些超长执行时间的业务中，锁的获取与释放间隔很长，所以锁的获取与释放不要共用同一个 jedis 连接
      * <pre>
      * 例子：
-     * Redis.use().withLock("lockStock", 120, 5, () -> {
+     * Redis.use().tryRunWithLock("lock:stock", 120, 5.0, () -> {
      *     // 业务代码
      * });
      *</pre>
-     * @param name 锁的名称或资源名称，与业务逻辑相关
-     * @param maxLockTime 最大锁定时间，单位秒
-     * @param retryTime 获取锁的重试时间，单位秒，支持小数，如：3.5
-     * @param fun 获取锁成功之后被回调的函数
+     * @param lockKey 锁的 key，与业务逻辑相关
+     * @param leaseSeconds 锁的租约时间（最大锁定时间），单位秒
+     * @param waitSeconds 获取锁的最长等待时间，单位秒，支持小数，如：3.5
+     * @param action 获取锁成功之后被回调的业务逻辑
      * @return 获取锁成功则返回 true，否则返回 false
      */
-    public boolean withLock(String name, int maxLockTime, double retryTime, Runnable fun) {
-        String lockId = lock(name, maxLockTime, retryTime);
+    public boolean tryRunWithLock(String lockKey, int leaseSeconds, double waitSeconds, Runnable action) {
+        String lockId = lock(lockKey, leaseSeconds, waitSeconds);
         if (lockId == null) {
             return false;
         }
         try {
-            fun.run();
+            action.run();
             return true;
         } finally {
-            unlock(name, lockId);
+            unlock(lockKey, lockId);
         }
-    }
-
-    /**
-     * redis 分布式锁。
-     * @param maxLockTimeAndRetryTime "最大锁定时间 maxLockTime" 与 "获取锁的重试时间 retryTime" 使用相同的值。
-     */
-    public boolean withLock(String name, double maxLockTimeAndRetryTime, Runnable fun) {
-        return withLock(name, (int) Math.ceil(maxLockTimeAndRetryTime), maxLockTimeAndRetryTime, fun);
     }
 
     /**
@@ -1850,5 +1842,4 @@ public class Cache {
         scan(cursor, null, null, keyList);
     }
 }
-
 
