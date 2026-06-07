@@ -1691,7 +1691,7 @@ public class Cache {
                 if ("OK".equals(jedis.set(lockKey, lockId, setParams))) {
                     return lockId;
                 }
-                if (System.currentTimeMillis() - startTime >= waitSeconds * 1000) {
+                if (System.currentTimeMillis() - startTime > waitSeconds * 1000) {
                     return null;
                 }
                 try {
