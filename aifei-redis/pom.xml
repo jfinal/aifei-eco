@@ -131,6 +131,7 @@
     </build>
 
     <profiles>
+        <!-- mvn -Pcentral-release clean deploy -->
         <profile>
             <id>central-release</id>
             <build>
