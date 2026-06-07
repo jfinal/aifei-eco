@@ -50,7 +50,7 @@
             <groupId>org.apache.fury</groupId>
             <artifactId>fury-core</artifactId>
             <version>${fury-core.version}</version>
-            <optional>true</optional>
+            <!-- <optional>true</optional> -->
         </dependency>
 
         <!-- fst 序列化。注意：高于 2.57 版本不支持 jdk 8 -->
