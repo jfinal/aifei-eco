@@ -1687,11 +1687,11 @@ public class Cache {
             String lockId = java.util.UUID.randomUUID().toString();
             SetParams setParams = new SetParams().nx().ex((long) leaseSeconds);
             long startTime = System.currentTimeMillis();
-            while (true) {
+            do {
                 if ("OK".equals(jedis.set(lockKey, lockId, setParams))) {
                     return lockId;
                 }
-                if (System.currentTimeMillis() - startTime > waitSeconds * 1000) {
+                if (System.currentTimeMillis() - startTime >= waitSeconds * 1000) {
                     return null;
                 }
                 try {
@@ -1700,7 +1700,8 @@ public class Cache {
                     Thread.currentThread().interrupt();     // Restore the interrupted status
                     return null;
                 }
-            }
+            } while (System.currentTimeMillis() - startTime < waitSeconds * 1000);
+            return null;
         } finally {
             close(jedis);
         }
