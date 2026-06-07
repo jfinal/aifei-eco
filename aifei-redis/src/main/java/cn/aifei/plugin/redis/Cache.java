@@ -1737,7 +1737,7 @@ public class Cache {
      * 为业务封装分布式锁，免去锁的获取、释放。在某些超长执行时间的业务中，锁的获取与释放间隔很长，所以锁的获取与释放不要共用同一个 jedis 连接
      * <pre>
      * 例子：
-     * Redis.use().tryExecuteWithLock("lock:stock", 120, 5.0, () -> {
+     * Redis.use().tryExecuteWithLock("lock:stock", 120, 3.5, () -> {
      *     // 业务代码
      * });
      *</pre>
