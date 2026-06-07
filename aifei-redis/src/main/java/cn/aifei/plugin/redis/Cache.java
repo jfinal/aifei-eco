@@ -1694,6 +1694,7 @@ public class Cache {
                 try {
                     Thread.sleep(50);
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();	// Restore the interrupted status
                     break;
                 }
             } while (System.currentTimeMillis() - startTime < waitSeconds * 1000);
