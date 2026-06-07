@@ -13,6 +13,29 @@
     <url>https://aifei.cn</url>
     <description>Redis plugin for Aifei.</description>
 
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>aifei</id>
+            <name>James</name>
+            <email>jfinal@126.com</email>
+            <url>https://aifei.cn</url>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/jfinal/aifei-eco.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/jfinal/aifei-eco.git</developerConnection>
+        <url>https://github.com/jfinal/aifei-eco</url>
+    </scm>
+
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
