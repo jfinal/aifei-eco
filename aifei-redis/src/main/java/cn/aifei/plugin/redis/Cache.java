@@ -1662,33 +1662,33 @@ public class Cache {
     /**
      * 利用 set 方法实现锁
      *
-     * SET resource-name anystring NX EX max-lock-time
+     * SET lock-key lock-id NX EX lease-seconds
      *
      * <pre>
      * 例子：
-     * String lockId = Redis.use().lock("lockStock", 120, 5)
+     * String lockId = Redis.use().lock("lock:stock", 120, 5.0);
      * if (lockId != null) {
      *     try {
      *        业务操作代码
      *     } finally {
-     *         Redis.use().unlock("lockStock", lockId);
+     *         Redis.use().unlock("lock:stock", lockId);
      *     }
      * }
      * </pre>
      *
-     * @param name 锁的名称，通常与业务逻辑相关
-     * @param maxLockTime 最大锁定时间，单位秒
-     * @param retryTime 获取锁的重试时间，单位秒，支持小数，如：3.5
+     * @param lockKey 锁的 key，与业务逻辑相关
+     * @param leaseSeconds 锁的租约时间，单位秒
+     * @param waitSeconds 获取锁的最长等待时间，单位秒，支持小数，如：3.5
      * @return 获取锁成功则返回 lockId，否则返回 null。释放锁方法 unlock 必须传入正确的 lockId
      */
-    public String lock(String name, int maxLockTime, double retryTime) {
+    public String lock(String lockKey, int leaseSeconds, double waitSeconds) {
         Jedis jedis = getJedis();
         try {
             String lockId = java.util.UUID.randomUUID().toString();
-            SetParams setParams = new SetParams().nx().ex((long) maxLockTime);
+            SetParams setParams = new SetParams().nx().ex((long) leaseSeconds);
             long startTime = System.currentTimeMillis();
             do {
-                if ("OK".equals(jedis.set(name, lockId, setParams))) {
+                if ("OK".equals(jedis.set(lockKey, lockId, setParams))) {
                     return lockId;
                 }
                 try {
@@ -1696,7 +1696,7 @@ public class Cache {
                 } catch (InterruptedException e) {
                     break;
                 }
-            } while (System.currentTimeMillis() - startTime < retryTime * 1000);
+            } while (System.currentTimeMillis() - startTime < waitSeconds * 1000);
             return null;
         } finally {
             close(jedis);
@@ -1705,15 +1705,15 @@ public class Cache {
 
     /**
      * 释放锁
-     * @param name 锁的名称
+     * @param lockKey 锁的 key，与业务逻辑相关
      * @param lockId 调用 lock(...) 方法成功获取锁时得到的返回值
      */
-    public void unlock(String name, String lockId) {
+    public void unlock(String lockKey, String lockId) {
         Jedis jedis = getJedis();
         try {
-            String value = jedis.get(name);
+            String value = jedis.get(lockKey);
             if (value != null && value.equals(lockId)) {
-                jedis.del(name);
+                jedis.del(lockKey);
             }
         } finally {
             close(jedis);
@@ -1731,7 +1731,7 @@ public class Cache {
      * });
      *</pre>
      * @param lockKey 锁的 key，与业务逻辑相关
-     * @param leaseSeconds 锁的租约时间（最大锁定时间），单位秒
+     * @param leaseSeconds 锁的租约时间，单位秒
      * @param waitSeconds 获取锁的最长等待时间，单位秒，支持小数，如：3.5
      * @param action 获取锁成功之后被回调的业务逻辑
      * @return 获取锁成功则返回 true，否则返回 false
