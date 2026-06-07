@@ -182,7 +182,7 @@
                         <extensions>true</extensions>
                         <configuration>
                             <publishingServerId>aifei</publishingServerId>
-                            <deploymentName>aifei-${project.version}</deploymentName>
+                            <deploymentName>aifei-redis-${project.version}</deploymentName>
                             <autoPublish>false</autoPublish>
                             <waitUntil>validated</waitUntil>
                         </configuration>
