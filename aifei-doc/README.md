@@ -20,7 +20,7 @@ Just Service 开发范式之下，无需编写 Controller、Render、Repository�
 
 ## Aifei Demo
 
-想要快速体验 Aifei，可以直接试试 [aifei-demo](https://gitee.com/jfinal/aifei-eco/aifei-demo) 。
+想要快速体验 Aifei，可以直接试试 [aifei-demo](https://gitee.com/jfinal/aifei-eco/tree/main/aifei-demo) 。
 
 aifei-demo 是一个标准的 maven 工程，按说明文件初始化数据库，导入 IDEA 运行 AifeiDemo 内的 main 方法即可体验。
 
