@@ -289,7 +289,7 @@ Db.sql("select * from user where id = #para(id)", Kv.of("id", 123)).find();
 //     #where(name)    -- 当 name 不为空时追加 and name = #para(name)
 //     #and(age)       -- 当 age 不为空时追加 and age = #para(age)
 //   #end
-Db.sqlById("findByCondition", Kv.of("name", "James", "age", 25)).find();
+Db.sqlById("findByCondition", Kv.of("name", "James",).set("age", 25)).find();
 ```
 
 `#where`、`#and`、`#orderBy` 三个自定义 Enjoy 指令专门用于动态 SQL 构建，设计极其优雅。`#para` 指令自动收集预处理参数防 SQL 注入。
