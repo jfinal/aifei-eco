@@ -612,7 +612,7 @@ API 的变化在于改为了链式调用，例如 Db.find(String sql, Object...)
     User.sql("select * from user").find();
 ```
 
-生成器已在 aifei-db 中提供，具体用法见 [aifei-demo](https://gitee.com/jfinal/aifei-eco/aifei-demo)
+生成器已在 aifei-db 中提供，具体用法见 [aifei-demo](https://gitee.com/jfinal/aifei-eco/tree/main/aifei-demo)
 
 
 ### 未完待续 ...
