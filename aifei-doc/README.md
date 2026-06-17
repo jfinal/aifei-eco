@@ -114,7 +114,7 @@ Aifei 提供 AifeiConfig 接口，将配置集中式管理。
 
 ## AifeiConfig 接口
 
-AifeiConfig 接口共有三个待实现方法以及两个 default 方法: 
+AifeiConfig 接口共有三个待实现方法以及两个 default 方法:
 
 ```java
 public interface AifeiConfig<I extends Input, O extends Output> {
@@ -134,7 +134,7 @@ Input、Output 泛型用于统一系统 IO 数据类型。
 
 ### config(Settings<I, O>)
 
-用于配置上游 Server、中游 Dispatcher、下游 Handler 链条，以及配置日志、全局拦截器、文件上传路径、文件下载路径。 
+用于配置上游 Server、中游 Dispatcher、下游 Handler 链条，以及配置日志、全局拦截器、文件上传路径、文件下载路径。
 
 ### config(Routes)
 
@@ -600,7 +600,7 @@ API 的变化在于改为了链式调用，例如 Db.find(String sql, Object...)
 
 此外，aifei-db 没有 Model 的概念，而是通过 Generator 生成 Model，生成的 Model 无需创建 dao 实例即可使用。
 
-以下例子展示生成器生成 User 后的用法: 
+以下例子展示生成器生成 User 后的用法:
 
 ```
     new User().name("james").insert();
