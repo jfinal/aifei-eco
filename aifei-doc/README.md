@@ -603,11 +603,11 @@ API 的变化在于改为了链式调用，例如 Db.find(String sql, Object...)
 以下例子展示生成器生成 User 后的用法:
 
 ```
-    new User().name("james").insert();
+    new User().name("James").insert();
     
     User.deleteById(123);
     
-    User.of(123).name("zhanbobo").update();
+    User.of(123).name("Zhanbo").update();
     
     User.sql("select * from user").find();
 ```
