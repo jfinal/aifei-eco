@@ -83,6 +83,8 @@ HIO 源于这十多年来我对框架设计的思考与实践，篇幅关系当�
 
 ### 创建 Service
 
+框架搭好之后，只需要专注编写业务代码：
+
 ```java
 @Path("/")
 public class TaskService {
