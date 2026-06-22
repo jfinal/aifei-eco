@@ -343,7 +343,7 @@ Aifei 没有 Model 概念，对于 Model 的支持完全由生成器实现。使
 ```
     Row.of("user").id(123).set("name", "James").update();
     
-    User.of(123).name("james").update();
+    User.of(123).name("James").update();
 ```
 
 通过 Row 更新
