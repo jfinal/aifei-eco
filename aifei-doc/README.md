@@ -271,11 +271,10 @@ Aifei 没有 Model 概念，对于 Model 的支持完全由生成器实现。使
     new UserRole().userId(123).roleId(456).insert();
 ```
 
-通过 Db + Row 插入
+通过 Row 插入
 
 ```
-    Row row = Row.of("user").set("name", "Aifei").set("age", 18);
-    Db.insert(row);
+    Row.of("user").set("name", "Aifei").set("age", 18).insert();
 ```
 
 ## 删除数据
@@ -345,11 +344,10 @@ Aifei 没有 Model 概念，对于 Model 的支持完全由生成器实现。使
     User.of(123).name("james").update();
 ```
 
-通过 Db + Row 更新
+通过 Row 更新
 
 ```
-    Row row = Row.of("user").id(123).set("name", "James");
-    Db.update(row);
+    Row.of("user").id(123).set("name", "James").update();
 ```
 
 ## 查询
