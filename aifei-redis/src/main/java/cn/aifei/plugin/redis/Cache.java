@@ -1305,7 +1305,7 @@ public class Cache {
         Jedis jedis = getJedis();
         try {
             List<byte[]> data = jedis.zrangeByScore(keyToBytes(key), min, max);
-            List<Object> result = new ArrayList<>();    // 有序集合必须 LinkedHashSet
+            List<Object> result = new ArrayList<>();
             valueSetFromBytesSet(data, result);
             return result;
         } finally {
