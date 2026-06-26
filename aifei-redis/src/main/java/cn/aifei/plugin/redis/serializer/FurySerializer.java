@@ -18,6 +18,7 @@ package cn.aifei.plugin.redis.serializer;
 
 import org.apache.fury.Fury;
 import org.apache.fury.ThreadSafeFury;
+import org.apache.fury.config.CompatibleMode;
 import org.apache.fury.config.Language;
 import redis.clients.jedis.util.SafeEncoder;
 
@@ -33,14 +34,11 @@ public class FurySerializer implements Serializer {
     static {
         fury = Fury.builder()
                 .withLanguage(Language.JAVA)
+                .withCompatibleMode(CompatibleMode.COMPATIBLE)
                 .withRefTracking(true)
                 .requireClassRegistration(false)
-                .withNumberCompressed(false)
-                // .withAsyncCompilation(true)
+                .suppressClassRegistrationWarnings(true)
                 .buildThreadSafeFury();
-                // .withCompatibleMode(CompatibleMode.SCHEMA_CONSISTENT)
-                // .buildThreadSafeFuryPool(8, 32, 5, TimeUnit.MINUTES);
-                // .buildThreadLocalFury();
     }
 
     @Override
