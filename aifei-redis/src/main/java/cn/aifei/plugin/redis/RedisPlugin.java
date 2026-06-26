@@ -33,7 +33,7 @@ import cn.aifei.plugin.redis.serializer.Serializer;
  */
 public class RedisPlugin implements Plugin {
 
-    protected volatile boolean isStarted = false;
+    protected volatile boolean started = false;
 
     protected String cacheName;
 
@@ -100,7 +100,7 @@ public class RedisPlugin implements Plugin {
     }
 
     public void start() {
-        if (isStarted) {
+        if (started) {
             return;
         }
 
@@ -129,7 +129,7 @@ public class RedisPlugin implements Plugin {
         Cache cache = new Cache(cacheName, jedisPool, serializer, keyNamingPolicy);
         Redis.addCache(cache);
 
-        isStarted = true;
+        started = true;
     }
 
     public void stop() {
@@ -139,7 +139,7 @@ public class RedisPlugin implements Plugin {
         }
         cache.jedisPool.destroy();
 
-        isStarted = false;
+        started = false;
     }
 
     /**
