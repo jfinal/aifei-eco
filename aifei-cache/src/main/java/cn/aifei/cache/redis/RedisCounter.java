@@ -10,7 +10,6 @@ import cn.aifei.cache.Counter;
 import cn.aifei.cache.internal.CacheValidator;
 import redis.clients.jedis.RedisClient;
 import redis.clients.jedis.exceptions.JedisDataException;
-import java.net.URI;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
@@ -19,7 +18,7 @@ import java.util.Objects;
 /**
  * 基于 Redis 的分布式计数实现。
  */
-public class RedisCounter implements Counter, AutoCloseable {
+public class RedisCounter implements Counter {
 
     private static final String COUNTER_PREFIX = "_Aifei_Counter_:";
     /*
@@ -40,34 +39,12 @@ public class RedisCounter implements Counter, AutoCloseable {
                     + "return redis.call('get', KEYS[1]);";
 
     private final RedisClient client;
-    private boolean closed;
 
     /**
-     * 连接默认 Redis 地址。
+     * 使用指定 Redis 客户端创建计数器。
      */
-    public RedisCounter() {
-        this(new RedisConfig());
-    }
-
-    /**
-     * 使用指定主机和端口连接 Redis。
-     */
-    public RedisCounter(String host, int port) {
-        this(new RedisConfig().host(host).port(port));
-    }
-
-    /**
-     * 使用指定 URI 连接 Redis。
-     */
-    public RedisCounter(URI redisUri) {
-        this(new RedisConfig().uri(redisUri));
-    }
-
-    /**
-     * 使用指定配置连接 Redis。
-     */
-    public RedisCounter(RedisConfig config) {
-        this.client = Objects.requireNonNull(config, "config can not be null").copy().createClient();
+    RedisCounter(RedisClient client) {
+        this.client = Objects.requireNonNull(client, "client can not be null");
     }
 
     /**
@@ -134,18 +111,6 @@ public class RedisCounter implements Counter, AutoCloseable {
             return;
         }
         client.del(counterKey(counterName, key));
-    }
-
-    /**
-     * 关闭 Redis 客户端；重复调用不会重复关闭。
-     */
-    @Override
-    public synchronized void close() {
-        if (closed) {
-            return;
-        }
-        client.close();
-        closed = true;
     }
 
     /**
@@ -241,4 +206,3 @@ public class RedisCounter implements Counter, AutoCloseable {
         return e;
     }
 }
-

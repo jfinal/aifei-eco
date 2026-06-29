@@ -19,7 +19,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Supplier;
 
 /**
  * 基于 Redis 的分布式缓存实现。
@@ -30,7 +29,6 @@ public class RedisCache implements Cache, AutoCloseable, CounterFactory {
 
     private final RedisClient client;
     private final RedisValueCodec codec;
-    private final Supplier<Counter> counterFactory;
     private boolean closed;
 
     /**
@@ -61,15 +59,14 @@ public class RedisCache implements Cache, AutoCloseable, CounterFactory {
         RedisConfig configSnapshot = Objects.requireNonNull(config, "config can not be null").copy();
         this.codec = configSnapshot.createValueCodec();
         this.client = configSnapshot.createClient();
-        this.counterFactory = () -> new RedisCounter(configSnapshot.copy());
     }
 
     /**
-     * 创建使用相同 Redis 连接配置的计数器。
+     * 创建共享相同 Redis 客户端和连接池的计数器。
      */
     @Override
     public Counter createCounter() {
-        return counterFactory.get();
+        return new RedisCounter(client);
     }
 
     /**

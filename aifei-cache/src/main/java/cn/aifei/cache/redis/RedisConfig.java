@@ -8,6 +8,7 @@ package cn.aifei.cache.redis;
 
 import redis.clients.jedis.ConnectionPoolConfig;
 import redis.clients.jedis.DefaultJedisClientConfig;
+import redis.clients.jedis.DefaultRedisCredentials;
 import redis.clients.jedis.Protocol;
 import redis.clients.jedis.RedisClient;
 import redis.clients.jedis.util.JedisURIHelper;
@@ -359,7 +360,7 @@ public class RedisConfig {
      * 设置每次空闲连接扫描检查的连接数量。
      */
     public RedisConfig numTestsPerEvictionRun(int numTestsPerEvictionRun) {
-        this.numTestsPerEvictionRun = numTestsPerEvictionRun;
+        this.numTestsPerEvictionRun = requirePositive(numTestsPerEvictionRun, "numTestsPerEvictionRun");
         return this;
     }
 
@@ -541,11 +542,8 @@ public class RedisConfig {
         if (timeoutMillis != null) {
             builder.timeoutMillis(timeoutMillis);
         }
-        if (user != null) {
-            builder.user(user);
-        }
-        if (password != null) {
-            builder.password(password);
+        if (user != null || password != null) {
+            builder.credentials(new DefaultRedisCredentials(effectiveUser(), effectivePassword()));
         }
         if (database != null) {
             builder.database(database);
@@ -616,6 +614,26 @@ public class RedisConfig {
             throw new IllegalArgumentException(name + " must be greater than or equal to -1");
         }
         return value;
+    }
+
+    /**
+     * 返回显式配置覆盖 URI 后的 Redis 用户名。
+     */
+    private String effectiveUser() {
+        if (user != null || redisUri == null) {
+            return user;
+        }
+        return JedisURIHelper.getUser(redisUri);
+    }
+
+    /**
+     * 返回显式配置覆盖 URI 后的 Redis 密码。
+     */
+    private String effectivePassword() {
+        if (password != null || redisUri == null) {
+            return password;
+        }
+        return JedisURIHelper.getPassword(redisUri);
     }
 
     /**

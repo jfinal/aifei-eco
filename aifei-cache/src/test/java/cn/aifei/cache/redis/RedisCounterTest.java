@@ -4,6 +4,7 @@ import org.junit.Test;
 
 import java.time.Duration;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 
@@ -13,11 +14,20 @@ import static org.junit.Assert.assertThrows;
 public class RedisCounterTest {
 
     /**
+     * 验证 RedisCounter 不暴露独立连接构造器，只由 RedisCache 创建。
+     */
+    @Test
+    public void shouldNotExposePublicConstructors() {
+        assertEquals(0, RedisCounter.class.getConstructors().length);
+    }
+
+    /**
      * 验证非法参数会在访问 Redis 前被拒绝。
      */
     @Test
     public void shouldRejectInvalidCounterArgumentsWithoutAccessingRedis() {
-        RedisCounter counter = new RedisCounter("127.0.0.1", 1);
+        RedisCache cache = new RedisCache("127.0.0.1", 1);
+        RedisCounter counter = (RedisCounter) cache.createCounter();
         Duration ttl = Duration.ofMinutes(1);
 
         try {
@@ -129,7 +139,7 @@ public class RedisCounterTest {
             assertThrows(IllegalArgumentException.class,
                     () -> counter.decreaseAndRefreshTtl("counter", "key", 1L, Duration.ZERO));
         } finally {
-            counter.close();
+            cache.close();
         }
     }
 }

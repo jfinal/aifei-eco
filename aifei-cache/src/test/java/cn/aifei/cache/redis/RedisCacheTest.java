@@ -1,7 +1,12 @@
 package cn.aifei.cache.redis;
 
 import org.junit.Test;
+import redis.clients.jedis.HostAndPort;
+import redis.clients.jedis.JedisClientConfig;
 import redis.clients.jedis.RedisClient;
+import redis.clients.jedis.RedisProtocol;
+import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.providers.ConnectionProvider;
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -204,6 +209,19 @@ public class RedisCacheTest {
     }
 
     /**
+     * 验证 RedisConfig 默认客户端配置适合普通应用开箱使用。
+     */
+    @Test
+    public void shouldApplyDefaultClientConfigToRedisClient() throws Exception {
+        RedisClient client = new RedisConfig().createClient();
+        try {
+            assertDefaultClientConfig(client, "127.0.0.1", 6379);
+        } finally {
+            client.close();
+        }
+    }
+
+    /**
      * 验证 RedisCache 便捷构造器复用 RedisConfig 的默认装配。
      */
     @Test
@@ -211,6 +229,123 @@ public class RedisCacheTest {
         RedisCache redisCache = new RedisCache(URI.create("redis://127.0.0.1:1"));
         try {
             assertDefaultPoolConfig(readClient(redisCache));
+        } finally {
+            redisCache.close();
+        }
+    }
+
+    /**
+     * 验证 RedisCache 便捷构造器复用 RedisConfig 的默认客户端配置。
+     */
+    @Test
+    public void shouldApplyDefaultClientConfigToRedisCacheConvenienceConstructors() throws Exception {
+        RedisCache redisCache = new RedisCache("redis.example.com", 6380);
+        try {
+            assertDefaultClientConfig(readClient(redisCache), "redis.example.com", 6380);
+        } finally {
+            redisCache.close();
+        }
+    }
+
+    /**
+     * 验证默认启用 JMX 时，同一 JVM 内多个默认连接池不会互相冲突。
+     */
+    @Test
+    public void shouldCreateMultipleDefaultClientsWithJmxEnabled() {
+        RedisClient first = new RedisConfig().createClient();
+        RedisClient second = new RedisConfig().createClient();
+        try {
+            assertNotNull(first.getPool().getJmxName());
+            assertNotNull(second.getPool().getJmxName());
+            assertFalse(first.getPool().getJmxName().equals(second.getPool().getJmxName()));
+        } finally {
+            first.close();
+            second.close();
+        }
+    }
+
+    /**
+     * 验证 URI 提供基础连接信息，显式配置会覆盖 URI 中对应的客户端配置。
+     */
+    @Test
+    public void shouldApplyExplicitClientConfigOverUri() throws Exception {
+        URI redisUri = URI.create("rediss://uri-user:uri-password@redis.example.com:6380/2?protocol=3");
+        RedisClient client = new RedisConfig()
+                .uri(redisUri)
+                .user("explicit-user")
+                .password("explicit-password")
+                .database(5)
+                .clientName("aifei-cache-test")
+                .ssl(false)
+                .timeoutMillis(4000)
+                .connectionTimeoutMillis(1500)
+                .socketTimeoutMillis(2500)
+                .blockingSocketTimeoutMillis(3500)
+                .createClient();
+        try {
+            assertHostAndPort(client, "redis.example.com", 6380);
+
+            JedisClientConfig clientConfig = readClientConfig(client);
+            assertEquals(1500, clientConfig.getConnectionTimeoutMillis());
+            assertEquals(2500, clientConfig.getSocketTimeoutMillis());
+            assertEquals(3500, clientConfig.getBlockingSocketTimeoutMillis());
+            assertEquals("explicit-user", clientConfig.getUser());
+            assertEquals("explicit-password", clientConfig.getPassword());
+            assertEquals(5, clientConfig.getDatabase());
+            assertEquals("aifei-cache-test", clientConfig.getClientName());
+            assertFalse(clientConfig.isSsl());
+            assertSame(RedisProtocol.RESP3, clientConfig.getRedisProtocol());
+        } finally {
+            client.close();
+        }
+    }
+
+    /**
+     * 验证只显式覆盖一项认证信息时，另一项仍沿用 URI。
+     */
+    @Test
+    public void shouldPreserveUriCredentialPartWhenOnlyOnePartIsExplicit() throws Exception {
+        URI redisUri = URI.create("redis://uri-user:uri-password@redis.example.com:6380/0");
+        RedisClient userOverrideClient = new RedisConfig()
+                .uri(redisUri)
+                .user("explicit-user")
+                .createClient();
+        RedisClient passwordOverrideClient = new RedisConfig()
+                .uri(redisUri)
+                .password("explicit-password")
+                .createClient();
+
+        try {
+            JedisClientConfig userOverride = readClientConfig(userOverrideClient);
+            assertEquals("explicit-user", userOverride.getUser());
+            assertEquals("uri-password", userOverride.getPassword());
+
+            JedisClientConfig passwordOverride = readClientConfig(passwordOverrideClient);
+            assertEquals("uri-user", passwordOverride.getUser());
+            assertEquals("explicit-password", passwordOverride.getPassword());
+        } finally {
+            userOverrideClient.close();
+            passwordOverrideClient.close();
+        }
+    }
+
+    /**
+     * 验证 RedisCache 自动创建的 RedisCounter 共享同一个 RedisClient 和连接池。
+     */
+    @Test
+    public void shouldCreateCounterSharingRedisClientPool() throws Exception {
+        RedisCache redisCache = new RedisCache(URI.create("redis://127.0.0.1:1"));
+        RedisCounter counter = (RedisCounter) redisCache.createCounter();
+        RedisClient client = readClient(redisCache);
+
+        try {
+            assertSame(client, readClient(counter));
+
+            assertFalse(counter instanceof AutoCloseable);
+            assertFalse(client.getPool().isClosed());
+
+            redisCache.close();
+            assertTrue(client.getPool().isClosed());
         } finally {
             redisCache.close();
         }
@@ -324,6 +459,20 @@ public class RedisCacheTest {
     }
 
     /**
+     * 验证每轮空闲连接扫描数量必须为正数，避免后台校验被误配置为无效扫描。
+     */
+    @Test
+    public void shouldRejectInvalidNumTestsPerEvictionRun() {
+        IllegalArgumentException zero = assertThrows(IllegalArgumentException.class,
+                () -> new RedisConfig().numTestsPerEvictionRun(0));
+        assertEquals("numTestsPerEvictionRun must be greater than 0", zero.getMessage());
+
+        IllegalArgumentException negative = assertThrows(IllegalArgumentException.class,
+                () -> new RedisConfig().numTestsPerEvictionRun(-1));
+        assertEquals("numTestsPerEvictionRun must be greater than 0", negative.getMessage());
+    }
+
+    /**
      * 验证 Fury 可以往返处理对象和集合。
      */
     @Test
@@ -370,6 +519,61 @@ public class RedisCacheTest {
         Field field = RedisCache.class.getDeclaredField("client");
         field.setAccessible(true);
         return (RedisClient) field.get(redisCache);
+    }
+
+    /**
+     * 读取 RedisCounter 内部 RedisClient，用于验证共享连接池。
+     */
+    private static RedisClient readClient(RedisCounter redisCounter) throws Exception {
+        Field field = RedisCounter.class.getDeclaredField("client");
+        field.setAccessible(true);
+        return (RedisClient) field.get(redisCounter);
+    }
+
+    /**
+     * 读取 RedisClient 的客户端配置。
+     */
+    private static JedisClientConfig readClientConfig(RedisClient client) throws Exception {
+        Object factory = client.getPool().getFactory();
+        Field field = factory.getClass().getDeclaredField("clientConfig");
+        field.setAccessible(true);
+        return (JedisClientConfig) field.get(factory);
+    }
+
+    /**
+     * 读取 RedisClient 的目标主机和端口。
+     */
+    private static HostAndPort readHostAndPort(RedisClient client) throws Exception {
+        Field field = UnifiedJedis.class.getDeclaredField("provider");
+        field.setAccessible(true);
+        ConnectionProvider provider = (ConnectionProvider) field.get(client);
+        return (HostAndPort) provider.getConnectionMap().keySet().iterator().next();
+    }
+
+    /**
+     * 验证默认 Redis 客户端配置。
+     */
+    private static void assertDefaultClientConfig(RedisClient client, String host, int port) throws Exception {
+        assertHostAndPort(client, host, port);
+        JedisClientConfig clientConfig = readClientConfig(client);
+        assertEquals(2000, clientConfig.getConnectionTimeoutMillis());
+        assertEquals(2000, clientConfig.getSocketTimeoutMillis());
+        assertEquals(0, clientConfig.getBlockingSocketTimeoutMillis());
+        assertNull(clientConfig.getUser());
+        assertNull(clientConfig.getPassword());
+        assertEquals(0, clientConfig.getDatabase());
+        assertNull(clientConfig.getClientName());
+        assertFalse(clientConfig.isSsl());
+        assertNull(clientConfig.getRedisProtocol());
+    }
+
+    /**
+     * 验证 RedisClient 的目标主机和端口。
+     */
+    private static void assertHostAndPort(RedisClient client, String host, int port) throws Exception {
+        HostAndPort hostAndPort = readHostAndPort(client);
+        assertEquals(host, hostAndPort.getHost());
+        assertEquals(port, hostAndPort.getPort());
     }
 
     /**

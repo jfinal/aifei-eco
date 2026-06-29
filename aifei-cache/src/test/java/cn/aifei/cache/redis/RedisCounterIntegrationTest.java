@@ -33,6 +33,7 @@ public class RedisCounterIntegrationTest {
     private static final String COUNTER_PREFIX = "_Aifei_Counter_:";
 
     private URI redisUri;
+    private RedisCache redisCache;
     private RedisCounter counter;
 
     /**
@@ -49,16 +50,17 @@ public class RedisCounterIntegrationTest {
     @Before
     public void createCounter() {
         redisUri = URI.create(System.getProperty("redis.uri", "redis://127.0.0.1:6379"));
-        counter = new RedisCounter(redisUri);
+        redisCache = new RedisCache(redisUri);
+        counter = (RedisCounter) redisCache.createCounter();
     }
 
     /**
-     * 测试结束后关闭计数器。
+     * 测试结束后关闭缓存，由缓存统一关闭 Redis 客户端。
      */
     @After
-    public void closeCounter() {
-        if (counter != null) {
-            counter.close();
+    public void closeCache() {
+        if (redisCache != null) {
+            redisCache.close();
         }
     }
 
@@ -136,26 +138,26 @@ public class RedisCounterIntegrationTest {
     @Test
     public void shouldNotConflictWithRedisCacheAgainstRealRedis() {
         String name = "integration-counter-cache-" + UUID.randomUUID();
-        RedisCache cache = new RedisCache(redisUri);
+        RedisCache valueCache = new RedisCache(redisUri);
 
         try {
-            cache.put(name, "same", "value", Duration.ofMinutes(1));
+            valueCache.put(name, "same", "value", Duration.ofMinutes(1));
             assertEquals(1L, counter.increase(name, "same", 1L, Duration.ofMinutes(1)));
 
-            assertEquals("value", cache.get(name, "same"));
+            assertEquals("value", valueCache.get(name, "same"));
             assertEquals(Long.valueOf(1L), counter.get(name, "same"));
 
             counter.remove(name, "same");
-            assertEquals("value", cache.get(name, "same"));
+            assertEquals("value", valueCache.get(name, "same"));
 
             assertEquals(2L, counter.increase(name, "same", 2L, Duration.ofMinutes(1)));
-            cache.remove(name, "same");
-            assertNull(cache.get(name, "same"));
+            valueCache.remove(name, "same");
+            assertNull(valueCache.get(name, "same"));
             assertEquals(Long.valueOf(2L), counter.get(name, "same"));
         } finally {
             counter.remove(name, "same");
-            cache.remove(name, "same");
-            cache.close();
+            valueCache.remove(name, "same");
+            valueCache.close();
         }
     }
 
@@ -276,7 +278,8 @@ public class RedisCounterIntegrationTest {
         try {
             for (int i = 0; i < threads; i++) {
                 executor.execute(() -> {
-                    RedisCounter workerCounter = new RedisCounter(redisUri);
+                    RedisCache workerCache = new RedisCache(redisUri);
+                    RedisCounter workerCounter = (RedisCounter) workerCache.createCounter();
                     try {
                         start.await();
                         for (int j = 0; j < iterations; j++) {
@@ -287,7 +290,7 @@ public class RedisCounterIntegrationTest {
                     } catch (Throwable e) {
                         failure.compareAndSet(null, e);
                     } finally {
-                        workerCounter.close();
+                        workerCache.close();
                         done.countDown();
                     }
                 });

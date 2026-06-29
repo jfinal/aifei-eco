@@ -370,7 +370,7 @@ RedisConfig config = new RedisConfig()
 自定义 `RedisValueCodec` 必须是线程安全的，并且共享同一 Redis 的所有应用实例必须使用互相兼容的
 codec 和数据格式。切换 codec 前，需要自行处理 Redis 中已有缓存数据的兼容性、清理或迁移。
 
-`CachePlugin(Cache)` 会根据 `CaffeineCache` 或 `RedisCache` 自动创建对应 `Counter`，并将 `Cache` 和 `Counter` 注册为单例。插件会在应用停止时关闭可关闭实例。配置完成后业务代码只需注入接口：
+`CachePlugin(Cache)` 会根据 `CaffeineCache` 或 `RedisCache` 自动创建对应 `Counter`，并将 `Cache` 和 `Counter` 注册为单例。自动创建的 `RedisCounter` 与 `RedisCache` 共享同一个 Redis 客户端和连接池，因此默认连接池上限仍按一组 `maxTotal=32` 计算。Redis 客户端生命周期由 `RedisCache` 管理，应用不需要单独创建或关闭 `RedisCounter`。配置完成后业务代码只需注入接口：
 
 ```java
 @Inject
