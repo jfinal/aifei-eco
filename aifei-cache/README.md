@@ -106,7 +106,7 @@ public interface Cache {
 }
 ```
 
-使用示例：
+常规用法：
 
 ```java
 @Inject
@@ -118,6 +118,69 @@ boolean exists = cache.exists("user", "42");
 boolean created = cache.putIfAbsent("job", "daily-report", "running", 300);
 boolean renewed = cache.expire("user", "42", 1800);
 cache.remove("user", "42");
+```
+
+### 写入后固定 TTL / 绝对过期
+
+缓存场景里，“固定窗口”更准确地说是写入后固定 TTL 或绝对过期：缓存项在写入或首次创建时确定过期时间，后续读取、存在性判断或 `putIfAbsent` 命中都不会延长有效期。它适合验证码、一次性 token、提交幂等标记、发送冷却标记、短期任务状态等必须在固定时间后自然失效的场景。
+
+```java
+@Inject
+Cache cache;
+
+cache.put("sms:code", phone, code, 300);
+
+String expectedCode = cache.get("sms:code", phone);
+if (expectedCode == null || !expectedCode.equals(submittedCode)) {
+    throw new InvalidCodeException();
+}
+
+cache.remove("sms:code", phone);
+```
+
+`putIfAbsent` 也常用于固定 TTL 的冷却或去重标记。标记已存在时不会覆盖原值，也不会重置原 TTL：
+
+```java
+boolean allowed = cache.putIfAbsent("sms:cooldown", phone, "1", 60);
+if (!allowed) {
+    throw new TooManyRequestsException();
+}
+```
+
+通过 Loader 加载的数据也是固定 TTL：命中时直接返回缓存值，不调用 Loader，也不会因为读取而续期。
+
+```java
+UserProfile profile = cache.get(
+        "user:profile",
+        userId,
+        1800,
+        () -> userService.loadProfile(userId)
+);
+```
+
+### 访问续期 / 闲置过期
+
+用户常说的 session 滑动过期，在缓存语境里更准确地说是访问续期或闲置过期：缓存项每次被业务确认仍然有效后，显式调用 `expire` 把剩余有效期重设为指定 TTL。它适合登录 session、临时会话状态、在线用户上下文、编辑草稿等“最后一次访问后 N 秒过期”的场景。
+
+```java
+@Inject
+Cache cache;
+
+Session session = cache.get("login:session", sessionId);
+if (session == null || !session.isValid()) {
+    throw new UnauthorizedException();
+}
+
+cache.expire("login:session", sessionId, 1800);
+```
+
+`expire` 只续期已存在且未过期的缓存项，不读取、不修改缓存值；缓存项不存在或已过期时返回 `false`。因此访问续期通常放在业务校验通过之后：
+
+```java
+CartDraft draft = cache.get("cart:draft", userId);
+if (draft != null) {
+    cache.expire("cart:draft", userId, 7200);
+}
 ```
 
 `cacheName` 不能为空白并可使用冒号分级，`key` 不能为空白且不能包含冒号。`clear("user")` 会同时清理 `user:profile` 等下级缓存。所有写入和续期都必须指定大于零的 TTL。缓存未命中、条目过期，或普通 `get` 收到非法 `cacheName`/`key` 时，返回 `null`。`exists` 在缓存项存在且未过期时返回 `true`，缓存项不存在、已过期或收到非法 `cacheName`/`key` 时返回 `false`。`putIfAbsent` 只在缓存项不存在或已过期时写入并返回 `true`；缓存项存在且未过期时不覆盖原值、不重置原 TTL，并返回 `false`。`expire` 只在缓存项存在且未过期时重设剩余有效期并返回 `true`，不读取、不修改缓存值；缓存项不存在或已过期时返回 `false`。`remove` 收到非法 `cacheName`/`key` 时按未命中处理，不删除任何缓存项。除普通 `get`、`exists` 和 `remove` 的非法 `cacheName`/`key` 外，参数校验失败统一抛出 `IllegalArgumentException`。
@@ -166,24 +229,57 @@ public interface Counter {
 }
 ```
 
-使用示例：
+`counterName` 不能为空白并可使用冒号分级，`key` 不能为空白且不能包含冒号。计数项不存在或已过期时，`get` 返回 `null`，增减方法按当前值 `0` 创建新计数项并使用传入 TTL。`step` 必须大于零，超过 `long` 范围时抛出 `ArithmeticException`。
+
+### 固定窗口计数
+
+`increase` 和 `decrease` 用于固定窗口计数：计数项第一次创建时确定过期时间，后续命中只更新数值，不延长窗口。它适合“从窗口开始后的 N 秒内累计多少次”这类场景，例如固定窗口限流、固定周期配额、验证码发送次数、文章当日阅读数等。
 
 ```java
 @Inject
 Counter counter;
 
-// 固定窗口计数：首次创建后 1 天过期，后续增加不延长 TTL。
-long views = counter.increase("article:views", "42", 1, 86400);
-Long currentViews = counter.get("article:views", "42");
-
-// 闲置过期计数：每次失败后把 TTL 刷新为 15 分钟。
-long failures = counter.increaseAndRefreshTtl("login:fail", "42", 1, 900);
-
-long quota = counter.decrease("user:quota", "42", 1, 3600);
-counter.remove("user:quota", "42");
+long requests = counter.increase("api:request", userId, 1, 60);
+if (requests > 100) {
+    throw new TooManyRequestsException();
+}
 ```
 
-`counterName` 不能为空白并可使用冒号分级，`key` 不能为空白且不能包含冒号。计数项不存在或已过期时，`get` 返回 `null`，增减方法按当前值 `0` 创建新计数项并使用传入 TTL。`increase` 和 `decrease` 用于固定窗口计数，计数项存在且未过期时只更新数值并保留原 TTL。`increaseAndRefreshTtl` 和 `decreaseAndRefreshTtl` 用于闲置过期计数，计数项存在且未过期时更新数值并将 TTL 刷新为传入值。刷新 TTL 的计数适合“最后一次活动后 N 秒过期”，不等价于精确的最近 N 秒滑动窗口统计。`step` 必须大于零，超过 `long` 范围时抛出 `ArithmeticException`。
+按自然周期统计时，推荐把周期放进 `counterName`，再用 TTL 控制历史计数自动清理：
+
+```java
+String day = LocalDate.now().toString();
+long views = counter.increase("article:views:" + day, articleId, 1, 172800);
+```
+
+### 滑动窗口/闲置过期计数
+
+`increaseAndRefreshTtl` 和 `decreaseAndRefreshTtl` 用于闲置过期计数：每次更新计数值时都会把 TTL 刷新为传入值。它适合“最后一次活动后 N 秒过期”这类场景，例如登录失败次数、会话内操作次数、用户活跃状态计数、临时冷却计数等。
+
+```java
+@Inject
+Counter counter;
+
+long failures = counter.increaseAndRefreshTtl("login:fail", userId, 1, 900);
+if (failures >= 5) {
+    accountService.lockTemporarily(userId);
+}
+```
+
+这种语义常被业务上称为“滑动过期”或“闲置过期”，但它不等价于精确的最近 N 秒滑动窗口统计。如果用户持续活跃，计数项会持续续期并继续累计；如果需要严格统计“最近 N 秒内发生了多少次”，应使用专门的时间桶或时间序列算法。
+
+```java
+long operations = counter.increaseAndRefreshTtl("session:ops", sessionId, 1, 1800);
+Long currentOperations = counter.get("session:ops", sessionId);
+```
+
+固定窗口和闲置过期可以在同一个应用中同时使用，关键是根据业务语义选择不同方法：
+
+```java
+long dailyViews = counter.increase("article:views:" + day, articleId, 1, 172800);
+long recentFailures = counter.increaseAndRefreshTtl("login:fail", userId, 1, 900);
+counter.remove("login:fail", userId);
+```
 
 `Counter` 与 `Cache` 是独立接口。精确计数需求应使用 `Counter`，不要通过 `Cache` 的 `get + put` 自行实现原子计数。
 
@@ -212,7 +308,7 @@ public void config(Plugins plugins) {
 }
 ```
 
-生产环境可以使用 `RedisConfig` 配置连接和连接池参数：
+生产环境可以使用 `RedisConfig` 配置连接、认证、连接池和 value 编解码器。大多数应用只需要设置 Redis 地址和认证信息：
 
 ```java
 @Override
@@ -220,17 +316,7 @@ public void config(Plugins plugins) {
     RedisConfig config = new RedisConfig()
             .uri("redis://127.0.0.1:6379/0")
             .user("default")
-            .password("password")
-            .database(0)
-            .timeoutMillis(2000)
-            .blockingSocketTimeoutMillis(0)
-            .maxTotal(64)
-            .maxIdle(16)
-            .minIdle(4)
-            .maxWaitMillis(3000)
-            .testOnBorrow(true)
-            .testWhileIdle(true)
-            .timeBetweenEvictionRunsMillis(60000);
+            .password("password");
 
     plugins.add(new CachePlugin(new RedisCache(config)));
 }
@@ -247,6 +333,29 @@ RedisConfig config = new RedisConfig()
 ```
 
 默认 host 与 Jedis 保持一致，为 `127.0.0.1`。没有默认使用 `localhost`，这样可以避免本机 hosts、DNS 或 IPv6 优先级差异影响连接行为。
+
+`RedisConfig` 的默认值按普通中小型 Web 应用设计：
+
+- 连接和 socket 超时默认 2000 毫秒；阻塞命令 socket 超时默认 0。
+- 连接池默认 `maxTotal=32`、`maxIdle=16`、`minIdle=1`、`maxWaitMillis=3000`。
+- 连接池耗尽时默认最多等待 3000 毫秒，不无限等待。
+- 只降低 `maxTotal` 或 `maxIdle` 时，未显式配置的默认空闲连接上下限会自动收缩到有效范围内。
+- 默认不在创建、借出或归还连接时校验，避免每次缓存操作额外发送校验命令。
+- 默认启用空闲连接校验：每 60000 毫秒扫描一次，每轮检查 8 条空闲连接；空闲 600000 毫秒后可硬淘汰，超过 `minIdle` 的连接空闲 120000 毫秒后可软淘汰。
+- 默认启用连接池 JMX，JMX 名称前缀为 `Aifei-Cache-Redis`。
+
+高并发、慢网络、代理层超时或连接数受限的部署，可以按实际容量覆盖这些值：
+
+```java
+RedisConfig config = new RedisConfig()
+        .uri("redis://127.0.0.1:6379/0")
+        .maxTotal(128)
+        .maxIdle(32)
+        .minIdle(4)
+        .maxWaitMillis(1000)
+        .timeoutMillis(1000)
+        .testOnBorrow(true);
+```
 
 `RedisConfig` 还支持 `clientName`、RESP3、JDK SSL 组件、`connectionTimeoutMillis`、`socketTimeoutMillis`、`blockWhenExhausted`、`lifo`、`fairness`、`testOnCreate`、`testOnReturn`、空闲连接淘汰时间和 JMX 基础参数。`maxTotal(-1)` 表示连接池最大连接数不限制。
 

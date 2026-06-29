@@ -37,28 +37,21 @@ public class RedisCache implements Cache, AutoCloseable, CounterFactory {
      * 连接默认 Redis 地址。
      */
     public RedisCache() {
-        this.codec = RedisConfig.defaultValueCodec();
-        this.client = RedisClient.create();
-        this.counterFactory = RedisCounter::new;
+        this(new RedisConfig());
     }
 
     /**
      * 使用指定主机和端口连接 Redis。
      */
     public RedisCache(String host, int port) {
-        this.codec = RedisConfig.defaultValueCodec();
-        this.client = RedisClient.create(host, port);
-        this.counterFactory = () -> new RedisCounter(host, port);
+        this(new RedisConfig().host(host).port(port));
     }
 
     /**
      * 使用指定 URI 连接 Redis。
      */
     public RedisCache(URI redisUri) {
-        URI validRedisUri = Objects.requireNonNull(redisUri, "redisUri can not be null");
-        this.codec = RedisConfig.defaultValueCodec();
-        this.client = RedisClient.create(validRedisUri);
-        this.counterFactory = () -> new RedisCounter(validRedisUri);
+        this(new RedisConfig().uri(redisUri));
     }
 
     /**

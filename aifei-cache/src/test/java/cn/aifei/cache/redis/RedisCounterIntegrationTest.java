@@ -30,7 +30,7 @@ import static org.junit.Assume.assumeTrue;
  */
 public class RedisCounterIntegrationTest {
 
-    private static final String COUNTER_PREFIX = "__aifei_cache_counter__:";
+    private static final String COUNTER_PREFIX = "_Aifei_Counter_:";
 
     private URI redisUri;
     private RedisCounter counter;

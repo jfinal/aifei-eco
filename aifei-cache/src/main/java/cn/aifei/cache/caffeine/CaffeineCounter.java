@@ -21,8 +21,11 @@ import java.util.concurrent.TimeUnit;
  */
 public class CaffeineCounter implements Counter {
 
-    public static final long DEFAULT_MAXIMUM_SIZE = 10_000L;
+    // counterLock 使用位掩码取下标，因此 COUNTER_LOCK_COUNT 必须保持 2 的幂。
+    // 如果改为非 2 的幂，应将下标计算改为 (hash & 0x7FFFFFFF) % COUNTER_LOCK_COUNT。
     private static final int COUNTER_LOCK_COUNT = 128;
+    private static final int COUNTER_LOCK_INDEX_MASK = COUNTER_LOCK_COUNT - 1;
+    public static final long DEFAULT_MAXIMUM_SIZE = 10_000L;
 
     private final com.github.benmanes.caffeine.cache.Cache<CaffeineCacheKey, Long> counters;
     private final Policy.VarExpiration<CaffeineCacheKey, Long> expiration;
@@ -120,8 +123,7 @@ public class CaffeineCounter implements Counter {
     /**
      * 使用分段锁原子更新或创建计数值。
      */
-    private long updateCounter(String counterName, String key, long step, Duration ttl,
-                               boolean increase, boolean refreshTtl) {
+    private long updateCounter(String counterName, String key, long step, Duration ttl, boolean increase, boolean refreshTtl) {
         String validCounterName = CacheValidator.requireCounterName(counterName);
         String validKey = CacheValidator.requireKey(key);
         long validStep = CacheValidator.requireCounterStep(step);
@@ -133,17 +135,17 @@ public class CaffeineCounter implements Counter {
             Long value = existingTtl.isPresent() ? counters.getIfPresent(counterKey) : null;
             if (value == null) {
                 long initialValue = increase ? validStep : Math.subtractExact(0L, validStep);
-                expiration.put(counterKey, Long.valueOf(initialValue), ttlMillis, TimeUnit.MILLISECONDS);
+                expiration.put(counterKey, initialValue, ttlMillis, TimeUnit.MILLISECONDS);
                 return initialValue;
             }
 
             long newValue = increase
-                    ? Math.addExact(value.longValue(), validStep)
-                    : Math.subtractExact(value.longValue(), validStep);
+                    ? Math.addExact(value, validStep)
+                    : Math.subtractExact(value, validStep);
             if (refreshTtl) {
-                expiration.put(counterKey, Long.valueOf(newValue), ttlMillis, TimeUnit.MILLISECONDS);
+                expiration.put(counterKey, newValue, ttlMillis, TimeUnit.MILLISECONDS);
             } else {
-                expiration.put(counterKey, Long.valueOf(newValue), existingTtl.getAsLong(), TimeUnit.NANOSECONDS);
+                expiration.put(counterKey, newValue, existingTtl.getAsLong(), TimeUnit.NANOSECONDS);
             }
             return newValue;
         }
@@ -154,7 +156,7 @@ public class CaffeineCounter implements Counter {
      */
     private Object counterLock(String counterName, String key) {
         int hash = 31 * counterName.hashCode() + key.hashCode();
-        return counterLocks[hash & (COUNTER_LOCK_COUNT - 1)];
+        return counterLocks[hash & COUNTER_LOCK_INDEX_MASK];
     }
 
     /**

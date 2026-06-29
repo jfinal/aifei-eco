@@ -10,7 +10,7 @@ package cn.aifei.cache.redis;
  * 定义 Redis 缓存值的编解码方式。
  *
  * <p>该接口是 {@link RedisCache} 的实现级扩展点，只用于 {@link RedisConfig} 装配，
- * 不属于顶层 {@code Cache} 公共抽象。实现必须是线程安全的；共享同一 Redis 的应用实例
+ * 不属于顶层 {@code Cache} 缓存抽象。实现必须是线程安全的；共享同一 Redis 的应用实例
  * 必须使用互相兼容的数据格式。</p>
  */
 public interface RedisValueCodec {

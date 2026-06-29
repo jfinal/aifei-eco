@@ -21,7 +21,7 @@ import java.util.Objects;
  */
 public class RedisCounter implements Counter, AutoCloseable {
 
-    private static final String COUNTER_PREFIX = "__aifei_cache_counter__:";
+    private static final String COUNTER_PREFIX = "_Aifei_Counter_:";
     /*
      * Redis Lua 会把嵌套命令的 integer reply 转为 Lua number，大整数直接返回可能丢精度。
      * 因此脚本执行 INCRBY 后读取 Redis 原始字符串作为返回值。
@@ -46,28 +46,28 @@ public class RedisCounter implements Counter, AutoCloseable {
      * 连接默认 Redis 地址。
      */
     public RedisCounter() {
-        this.client = RedisClient.create();
+        this(new RedisConfig());
     }
 
     /**
      * 使用指定主机和端口连接 Redis。
      */
     public RedisCounter(String host, int port) {
-        this.client = RedisClient.create(host, port);
+        this(new RedisConfig().host(host).port(port));
     }
 
     /**
      * 使用指定 URI 连接 Redis。
      */
     public RedisCounter(URI redisUri) {
-        this.client = RedisClient.create(Objects.requireNonNull(redisUri, "redisUri can not be null"));
+        this(new RedisConfig().uri(redisUri));
     }
 
     /**
      * 使用指定配置连接 Redis。
      */
     public RedisCounter(RedisConfig config) {
-        this.client = Objects.requireNonNull(config, "config can not be null").createClient();
+        this.client = Objects.requireNonNull(config, "config can not be null").copy().createClient();
     }
 
     /**
@@ -228,17 +228,17 @@ public class RedisCounter implements Counter, AutoCloseable {
      */
     private static RuntimeException translateCounterException(JedisDataException e) {
         String message = e.getMessage();
-        if (message != null && message.indexOf("overflow") != -1) {
+        if (message != null && message.contains("overflow")) {
             ArithmeticException overflow = new ArithmeticException(message);
             overflow.initCause(e);
             return overflow;
         }
-        if (message != null && (message.indexOf("not an integer") != -1
-                || message.indexOf("out of range") != -1
-                || message.indexOf("counter value must have ttl") != -1)) {
+        if (message != null && (message.contains("not an integer")
+                || message.contains("out of range")
+                || message.contains("counter value must have ttl"))) {
             return new IllegalStateException("counter value must be Redis integer with ttl", e);
         }
         return e;
     }
-
 }
+

@@ -43,7 +43,7 @@ aifei-cache 是为 aifei 提供的极简缓存与计数抽象。它让业务项�
 
 ## 当前技术边界
 
-- 公共抽象：`Cache`
+- 缓存抽象：`Cache`
 - 计数抽象：`Counter`
 - 本地缓存实现：`CaffeineCache`
 - 分布式缓存实现：`RedisCache`
@@ -196,8 +196,14 @@ public interface Counter {
 - `RedisConfig` 支持配置 URI、host、port、user、password、database、clientName、RESP3、SSL、JDK SSL 组件、连接超时、socket 超时、阻塞命令 socket 超时、maxTotal、maxIdle、minIdle、maxWaitMillis、连接池耗尽策略、连接池校验、空闲连接扫描、JMX 基础参数和 `RedisValueCodec`。
 - `CachePlugin` 基于 `RedisCache` 自动创建 `RedisCounter` 时，复用相同的 Redis 连接、客户端和连接池配置；`RedisValueCodec` 仍只影响普通缓存 value。
 - `RedisConfig` 默认 host 使用 Jedis 的 `Protocol.DEFAULT_HOST`，当前为 `127.0.0.1`。不默认使用 `localhost`，避免受本机 hosts、DNS 或 IPv6 优先级影响。
+- `RedisConfig` 默认值面向普通中小型 Web 应用：连接与 socket 超时默认 2000 毫秒，阻塞命令 socket 超时默认 0，连接池默认 `maxTotal=32`、`maxIdle=16`、`minIdle=1`、`maxWaitMillis=3000`。
+- `RedisConfig` 默认在连接池耗尽时最多等待 3000 毫秒后失败，不无限等待；默认使用 LIFO、非公平等待队列，优先吞吐和低调度开销。
+- 当用户只降低 `maxTotal` 或 `maxIdle` 时，未显式配置的默认 `maxIdle` 或 `minIdle` 会自动收缩到有效上限内；用户显式配置出互相冲突的连接池上下限时仍抛出 `IllegalArgumentException`。
+- `RedisConfig` 默认不在创建、借出或归还连接时执行校验，避免每次缓存操作增加额外 Redis 往返；默认启用空闲连接校验，扫描间隔 60000 毫秒，每轮检查 8 条空闲连接，硬空闲淘汰时间 600000 毫秒，超过 `minIdle` 的软空闲淘汰时间 120000 毫秒。
+- `RedisConfig` 默认启用连接池 JMX，默认 JMX 名称前缀为 `Aifei-Cache-Redis`。
 - `RedisConfig.maxTotal(-1)` 表示连接池最大连接数不限制。`maxWaitMillis`、`timeBetweenEvictionRunsMillis`、`minEvictableIdleTimeMillis` 和 `softMinEvictableIdleTimeMillis` 的 `-1` 语义与 commons-pool 保持一致。
 - 当同时配置 URI 和其他客户端参数时，URI 提供基础连接信息，显式设置的 user、password、database、clientName、SSL 和超时参数覆盖 URI 中对应的客户端配置。
+- `RedisCache` 和 `RedisCounter` 的无参、host/port 与 URI 便捷构造器均复用 `RedisConfig` 默认装配，避免便捷构造器与配置对象构造器出现不同默认行为。
 - 物理 key 格式为 `{cacheName}:{key}`。`clear` 扫描时会转义 Redis glob 特殊字符；清理父级名称时也会清理其下级名称。
 - 默认 value codec 使用 Fury `CompatibleMode.COMPATIBLE` 序列化为二进制数据，支持滚动发布期间常见的 POJO 字段增删。
 - 默认 Fury codec 启用引用跟踪，支持缓存快照中的共享引用和循环引用；数字编码使用 Fury 默认压缩策略，不关闭 number compression。

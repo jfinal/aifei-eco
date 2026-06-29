@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.List;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
@@ -190,6 +191,62 @@ public class RedisCacheTest {
     }
 
     /**
+     * 验证 RedisConfig 默认连接池配置适合普通应用开箱使用。
+     */
+    @Test
+    public void shouldApplyDefaultPoolConfigToRedisClient() {
+        RedisClient client = new RedisConfig().createClient();
+        try {
+            assertDefaultPoolConfig(client);
+        } finally {
+            client.close();
+        }
+    }
+
+    /**
+     * 验证 RedisCache 便捷构造器复用 RedisConfig 的默认装配。
+     */
+    @Test
+    public void shouldApplyDefaultPoolConfigToRedisCacheConvenienceConstructors() throws Exception {
+        RedisCache redisCache = new RedisCache(URI.create("redis://127.0.0.1:1"));
+        try {
+            assertDefaultPoolConfig(readClient(redisCache));
+        } finally {
+            redisCache.close();
+        }
+    }
+
+    /**
+     * 验证用户只降低最大连接数时，未显式配置的默认空闲上限会自动贴合。
+     */
+    @Test
+    public void shouldAdaptDefaultMaxIdleWhenOnlyMaxTotalIsReduced() {
+        RedisClient client = new RedisConfig().maxTotal(4).createClient();
+        try {
+            assertEquals(4, client.getPool().getMaxTotal());
+            assertEquals(4, client.getPool().getMaxIdle());
+            assertEquals(1, client.getPool().getMinIdle());
+        } finally {
+            client.close();
+        }
+    }
+
+    /**
+     * 验证用户只降低最大空闲连接数时，未显式配置的默认最小空闲数会自动贴合。
+     */
+    @Test
+    public void shouldAdaptDefaultMinIdleWhenOnlyMaxIdleIsReduced() {
+        RedisClient client = new RedisConfig().maxIdle(0).createClient();
+        try {
+            assertEquals(32, client.getPool().getMaxTotal());
+            assertEquals(0, client.getPool().getMaxIdle());
+            assertEquals(0, client.getPool().getMinIdle());
+        } finally {
+            client.close();
+        }
+    }
+
+    /**
      * 验证连接池配置会应用到 RedisClient。
      */
     @Test
@@ -304,6 +361,38 @@ public class RedisCacheTest {
         Field field = RedisCache.class.getDeclaredField("codec");
         field.setAccessible(true);
         return (RedisValueCodec) field.get(redisCache);
+    }
+
+    /**
+     * 读取 RedisCache 内部 RedisClient，用于验证便捷构造器装配结果。
+     */
+    private static RedisClient readClient(RedisCache redisCache) throws Exception {
+        Field field = RedisCache.class.getDeclaredField("client");
+        field.setAccessible(true);
+        return (RedisClient) field.get(redisCache);
+    }
+
+    /**
+     * 验证项目层定义的 Redis 连接池默认值。
+     */
+    private static void assertDefaultPoolConfig(RedisClient client) {
+        assertEquals(32, client.getPool().getMaxTotal());
+        assertEquals(16, client.getPool().getMaxIdle());
+        assertEquals(1, client.getPool().getMinIdle());
+        assertEquals(3000, client.getPool().getMaxWaitDuration().toMillis());
+        assertTrue(client.getPool().getBlockWhenExhausted());
+        assertTrue(client.getPool().getLifo());
+        assertFalse(client.getPool().getFairness());
+        assertFalse(client.getPool().getTestOnCreate());
+        assertFalse(client.getPool().getTestOnBorrow());
+        assertFalse(client.getPool().getTestOnReturn());
+        assertTrue(client.getPool().getTestWhileIdle());
+        assertEquals(60000, client.getPool().getDurationBetweenEvictionRuns().toMillis());
+        assertEquals(600000, client.getPool().getMinEvictableIdleDuration().toMillis());
+        assertEquals(120000, client.getPool().getSoftMinEvictableIdleDuration().toMillis());
+        assertEquals(8, client.getPool().getNumTestsPerEvictionRun());
+        assertNotNull(client.getPool().getJmxName());
+        assertTrue(String.valueOf(client.getPool().getJmxName()).contains("Aifei-Cache-Redis"));
     }
 
     /**
