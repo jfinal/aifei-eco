@@ -28,6 +28,13 @@ public final class CacheValidator {
     }
 
     /**
+     * 判断计数名称与计数键是否有效。
+     */
+    public static boolean isValidCounterNameAndKey(String counterName, String key) {
+        return isValidCacheNameAndKey(counterName, key);
+    }
+
+    /**
      * 校验缓存名称非空白。
      */
     public static String requireCacheName(String cacheName) {
@@ -35,6 +42,16 @@ public final class CacheValidator {
             throw new IllegalArgumentException("cacheName can not be blank");
         }
         return cacheName;
+    }
+
+    /**
+     * 校验计数名称非空白。
+     */
+    public static String requireCounterName(String counterName) {
+        if (StrUtil.isBlank(counterName)) {
+            throw new IllegalArgumentException("counterName can not be blank");
+        }
+        return counterName;
     }
 
     /**
@@ -62,6 +79,16 @@ public final class CacheValidator {
             throw new IllegalArgumentException("ttl must be at least one millisecond");
         }
         return ttlMillis;
+    }
+
+    /**
+     * 校验计数步长大于零。
+     */
+    public static long requireCounterStep(long step) {
+        if (step <= 0) {
+            throw new IllegalArgumentException("step must be greater than zero");
+        }
+        return step;
     }
 
     /**

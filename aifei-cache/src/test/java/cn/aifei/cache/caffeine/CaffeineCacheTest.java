@@ -2,6 +2,7 @@ package cn.aifei.cache.caffeine;
 
 import cn.aifei.cache.Cache;
 import cn.aifei.cache.CacheContractTest;
+import cn.aifei.cache.Counter;
 import com.github.benmanes.caffeine.cache.Ticker;
 import org.junit.Test;
 
@@ -9,6 +10,7 @@ import java.time.Duration;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 
@@ -73,6 +75,36 @@ public class CaffeineCacheTest extends CacheContractTest {
     }
 
     /**
+     * 验证缓存创建的计数器复用相同 Caffeine 配置。
+     */
+    @Test
+    public void shouldCreateCounterWithSameCaffeineSettings() throws InterruptedException {
+        FakeTicker counterTicker = new FakeTicker();
+        CaffeineCache boundedCache = new CaffeineCache(1, counterTicker);
+        Counter counter = boundedCache.createCounter();
+
+        counter.increase("derived", "1", 1L, Duration.ofMillis(10));
+        counter.increase("derived", "2", 1L, Duration.ofMillis(10));
+
+        long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
+        int presentEntries;
+        do {
+            presentEntries = countPresentCounterEntries(counter);
+            if (presentEntries <= 1) {
+                break;
+            }
+            Thread.sleep(10);
+        } while (System.nanoTime() < deadline);
+
+        assertEquals(1, presentEntries);
+
+        counterTicker.advance(Duration.ofMillis(11));
+
+        assertNull(counter.get("derived", "1"));
+        assertNull(counter.get("derived", "2"));
+    }
+
+    /**
      * 统计当前仍可读取的测试条目。
      */
     private static int countPresentEntries(CaffeineCache cache) {
@@ -81,6 +113,20 @@ public class CaffeineCacheTest extends CacheContractTest {
             count++;
         }
         if (cache.get("values", "2") != null) {
+            count++;
+        }
+        return count;
+    }
+
+    /**
+     * 统计当前仍可读取的测试计数项。
+     */
+    private static int countPresentCounterEntries(Counter counter) {
+        int count = 0;
+        if (counter.get("derived", "1") != null) {
+            count++;
+        }
+        if (counter.get("derived", "2") != null) {
             count++;
         }
         return count;

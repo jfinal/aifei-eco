@@ -4,7 +4,7 @@
 
 ## 项目定位
 
-aifei-cache 是为 aifei 提供的极简缓存抽象。它让业务项目面向统一的 `Cache` 接口编程，并通过 aifei 的 `@Inject` 注解注入具体实现。
+aifei-cache 是为 aifei 提供的极简缓存与计数抽象。它让业务项目面向统一的 `Cache` 和 `Counter` 接口编程，并通过 aifei 的 `@Inject` 注解注入具体实现。
 
 项目支持应用按部署阶段选择缓存方案：
 
@@ -14,7 +14,7 @@ aifei-cache 是为 aifei 提供的极简缓存抽象。它让业务项目面向�
 
 ## 核心设计目标
 
-1. 设计极简的 `Cache` 接口。用户项目只依赖该接口，不依赖具体实现。
+1. 设计极简的 `Cache` 和 `Counter` 接口。用户项目只依赖接口，不依赖具体实现。
 2. 提供基于 Caffeine 的实现，用于单实例部署。
 3. 提供基于 Redis 的实现，用于集群部署。
 4. 保持两种实现可替换，使应用能够随流量增长从 Caffeine 平滑切换到 Redis。
@@ -23,15 +23,15 @@ aifei-cache 是为 aifei 提供的极简缓存抽象。它让业务项目面向�
 
 ### 面向接口
 
-业务代码只允许依赖 `cn.aifei.cache.Cache`。Caffeine、Jedis、Fury 等第三方库及其类型不能出现在 `Cache` 公共 API 中。
+业务代码只允许依赖 `cn.aifei.cache.Cache` 和 `cn.aifei.cache.Counter`。Caffeine、Jedis、Fury 等第三方库及其类型不能出现在公共 API 中。
 
 ### 实现可替换
 
-`CaffeineCache` 和 `RedisCache` 必须遵循相同的接口契约。切换实现只能影响依赖注入或应用配置，不应要求修改缓存调用代码。
+`CaffeineCache` 和 `RedisCache` 必须遵循相同的缓存接口契约，`CaffeineCounter` 和 `RedisCounter` 必须遵循相同的计数接口契约。切换实现只能影响依赖注入或应用配置，不应要求修改业务调用代码。
 
 ### 保持极简
 
-`Cache` 只提供业务缓存所需的最小能力。新增方法、配置项或扩展点前，应确认它对两种实现均有清晰且一致的语义。
+`Cache` 只提供业务缓存所需的最小能力，`Counter` 只提供业务计数所需的最小能力。新增方法、配置项或扩展点前，应确认它对两种实现均有清晰且一致的语义。
 
 ### 部署模式明确
 
@@ -44,8 +44,11 @@ aifei-cache 是为 aifei 提供的极简缓存抽象。它让业务项目面向�
 ## 当前技术边界
 
 - 公共抽象：`Cache`
+- 计数抽象：`Counter`
 - 本地缓存实现：`CaffeineCache`
 - 分布式缓存实现：`RedisCache`
+- 本地计数实现：`CaffeineCounter`
+- 分布式计数实现：`RedisCounter`
 - 本地缓存引擎：Caffeine
 - Redis 客户端：Jedis
 - Redis value 序列化：默认 Fury，可通过 `RedisValueCodec` 自定义
@@ -86,12 +89,43 @@ public interface Cache {
 
 接口提供读取、存在性判断、未命中加载、限时写入、条件限时写入、限时续期、删除和命名空间清理能力。第一版不提供永久写入、批量操作、统计或具体实现专属能力。
 
+## Counter 接口
+
+```java
+public interface Counter {
+
+    Long get(String counterName, String key);
+
+    long increase(String counterName, String key, long step, Duration ttl);
+
+    long increase(String counterName, String key, long step, int ttlSeconds);
+
+    long increaseAndRefreshTtl(String counterName, String key, long step, Duration ttl);
+
+    long increaseAndRefreshTtl(String counterName, String key, long step, int ttlSeconds);
+
+    long decrease(String counterName, String key, long step, Duration ttl);
+
+    long decrease(String counterName, String key, long step, int ttlSeconds);
+
+    long decreaseAndRefreshTtl(String counterName, String key, long step, Duration ttl);
+
+    long decreaseAndRefreshTtl(String counterName, String key, long step, int ttlSeconds);
+
+    void remove(String counterName, String key);
+}
+```
+
+`Counter` 提供轻量计数读取、固定窗口增减、闲置过期增减和删除能力，不负责普通缓存 value 的序列化和读取。
+
 ### 参数与返回值
 
 - `cacheName` 和 `key` 是区分大小写的非空白字符串。`cacheName` 可用冒号分级，`key` 不能包含冒号。
+- `counterName` 与 `cacheName` 遵循相同命名规则。
 - `value` 不能为 `null`。
 - `ttl` 不能为 `null`，转换为毫秒后必须大于零。
 - `ttlSeconds` 必须大于零，秒重载通过 default 方法转为 `Duration`。
+- `Counter` 的 `step` 必须大于零。
 - TTL 统一按毫秒精度处理，不足一毫秒的时长不被接受。
 - `get` 在缓存未命中或条目过期时返回 `null`。
 - 普通 `get(cacheName, key)` 在 `cacheName` 或 `key` 非法时也返回 `null`，按不可能命中处理。
@@ -104,6 +138,15 @@ public interface Cache {
 - 调用方必须保证 `get` 的接收类型与此前写入的 value 类型一致。
 - `putIfAbsent` 在缓存项不存在或已过期时写入并返回 `true`；缓存项存在且未过期时不覆盖原 value、不重置原 TTL，并返回 `false`。
 - `expire` 在缓存项存在且未过期时只重设剩余有效期并返回 `true`；缓存项不存在或已过期时不写入、不复活缓存项，并返回 `false`。
+- `Counter.get` 在计数项不存在、已过期或 `counterName`、`key` 非法时返回 `null`。
+- `Counter.increase` 和 `Counter.decrease` 返回更新后的计数值。
+- `Counter.increase` 和 `Counter.decrease` 在计数项不存在或已过期时按当前值 `0` 处理，使用传入 TTL 创建计数项。
+- `Counter.increase` 和 `Counter.decrease` 在计数项存在且未过期时只更新计数值，保留原 TTL，不使用传入 TTL 重置有效期。
+- `Counter.increaseAndRefreshTtl` 和 `Counter.decreaseAndRefreshTtl` 返回更新后的计数值。
+- `Counter.increaseAndRefreshTtl` 和 `Counter.decreaseAndRefreshTtl` 在计数项不存在或已过期时按当前值 `0` 处理，使用传入 TTL 创建计数项。
+- `Counter.increaseAndRefreshTtl` 和 `Counter.decreaseAndRefreshTtl` 在计数项存在且未过期时更新计数值，并在同一条计数项的原子更新操作中将剩余有效期重置为传入 TTL。
+- `Counter` 的增减方法使用 JDK `long` 计数语义；超过 `long` 范围时抛出 `ArithmeticException`。
+- `Counter.remove` 删除不存在的计数项，或在 `counterName`、`key` 非法时，正常返回且不删除任何计数项。
 - `remove` 删除不存在的条目，或在 `cacheName`、`key` 非法时，正常返回且不删除任何条目。
 - `clear` 清理不存在的 `cacheName` 时正常返回。
 
@@ -114,6 +157,10 @@ public interface Cache {
 - `putIfAbsent` 是单条缓存项的条件写入操作，不承诺分布式锁语义；`CaffeineCache` 只提供单进程内条件写入，`RedisCache` 依赖 Redis 单 key 条件写入。
 - `expire` 是单条缓存项的显式续期操作，不读取、不反序列化、不修改 value；调用方可用于滑动时间窗口，但本接口不提供按访问自动续期。
 - `exists` 只表示调用时缓存项存在，不保证后续 `get`、`remove` 或其他调用仍能命中。
+- `Counter` 是独立计数抽象，不通过 `Cache` 读取、写入或删除计数值。
+- `Counter.increase` 和 `Counter.decrease` 用于固定窗口计数：第一次创建计数项时确定过期时间，后续命中更新不延长窗口。
+- `Counter.increaseAndRefreshTtl` 和 `Counter.decreaseAndRefreshTtl` 用于闲置过期计数：每次命中更新后从当前调用重新计算 TTL，但不等价于精确的最近 N 秒滑动窗口统计。
+- `Counter` 的增减方法是单条计数项的原子更新操作；`CaffeineCounter` 保证单进程内同 key 原子更新，`RedisCounter` 保证 Redis 单 key 原子更新，不承诺跨 key 原子性。
 - `clear(cacheName)` 清理指定命名空间及其下级命名空间。
 - `clear` 是非原子、尽力清理操作；与并发写入同时发生时，不保证并发写入的条目最终保留或删除。
 - 业务代码应将缓存值当作不可变数据使用。Caffeine 保存对象引用，Redis 保存序列化快照，修改原对象后的可见性不属于接口契约。
@@ -125,6 +172,7 @@ public interface Cache {
 
 - 使用 Caffeine 的逐条过期能力实现每个条目独立 TTL。
 - 默认最多保存 10000 个条目，并允许通过构造参数覆盖上限。
+- `CachePlugin` 基于 `CaffeineCache` 自动创建 `CaffeineCounter` 时，复用相同的最大条目数量配置。
 - value 直接保存在本地缓存中，不通过序列化复制对象。
 - 本地缓存操作不额外捕获 Caffeine 运行时异常，异常按原始类型传播。
 - `exists` 通过本地缓存项是否可读取判断存在性。
@@ -132,11 +180,21 @@ public interface Cache {
 - `expire` 使用 Caffeine 逐条过期策略重设已有条目的剩余有效期。
 - `clear` 遍历本地 key 并清理指定命名空间及其下级。
 
+### CaffeineCounter
+
+- 使用独立的 Caffeine 存储 `Long` 计数值，不与 `CaffeineCache` 共享存储。
+- 使用 Caffeine 的逐条过期能力实现每个计数项独立 TTL。
+- 默认最多保存 10000 个计数项，并允许通过构造参数覆盖上限。
+- `increase` 和 `decrease` 使用 128 把 striped locks 按 `counterName` 和 `key` 分散加锁，在锁内读取、计算并写回计数值。
+- 命中更新时保留原剩余 TTL；缺失创建时使用调用传入的 TTL。
+- `increaseAndRefreshTtl` 和 `decreaseAndRefreshTtl` 复用相同的 striped locks，在锁内读取、计算、写回计数值并将剩余 TTL 重置为调用传入的 TTL。
+
 ### RedisCache
 
 - `RedisCache` 允许通过 `RedisConfig` 配置 Redis 连接、连接池参数和 value 编解码器。该配置类属于具体实现的装配入口，不进入 `Cache` 公共接口，也不改变业务代码只依赖 `Cache` 的约束。
 - `RedisConfig` 的公共 API 除本项目定义的 `RedisValueCodec` 扩展点外，只能使用 JDK 类型、字符串和基本类型，不暴露 Jedis、连接池、Fury 或其他第三方序列化库类型。
 - `RedisConfig` 支持配置 URI、host、port、user、password、database、clientName、RESP3、SSL、JDK SSL 组件、连接超时、socket 超时、阻塞命令 socket 超时、maxTotal、maxIdle、minIdle、maxWaitMillis、连接池耗尽策略、连接池校验、空闲连接扫描、JMX 基础参数和 `RedisValueCodec`。
+- `CachePlugin` 基于 `RedisCache` 自动创建 `RedisCounter` 时，复用相同的 Redis 连接、客户端和连接池配置；`RedisValueCodec` 仍只影响普通缓存 value。
 - `RedisConfig` 默认 host 使用 Jedis 的 `Protocol.DEFAULT_HOST`，当前为 `127.0.0.1`。不默认使用 `localhost`，避免受本机 hosts、DNS 或 IPv6 优先级影响。
 - `RedisConfig.maxTotal(-1)` 表示连接池最大连接数不限制。`maxWaitMillis`、`timeBetweenEvictionRunsMillis`、`minEvictableIdleTimeMillis` 和 `softMinEvictableIdleTimeMillis` 的 `-1` 语义与 commons-pool 保持一致。
 - 当同时配置 URI 和其他客户端参数时，URI 提供基础连接信息，显式设置的 user、password、database、clientName、SSL 和超时参数覆盖 URI 中对应的客户端配置。
@@ -157,16 +215,26 @@ public interface Cache {
 - `clear` 默认使用 `SCAN COUNT 1000`。该值是 Redis 每轮扫描工作量提示，不保证每页返回数量；默认选择以减少网络往返和控制单次 Redis 事件循环占用为目标，不作为 `Cache` 公共 API 暴露。
 - 第一版面向多个应用实例共享同一 Redis 服务的部署方式，不承诺 Redis Cluster 分片场景下的跨节点清理能力。
 
+### RedisCounter
+
+- 使用独立 Redis key 命名空间和 Redis 原生 integer value，不经过 `RedisValueCodec`。
+- 计数物理 key 使用内部前缀，与 `RedisCache` 的 `{cacheName}:{key}` 普通缓存 key 隔离。
+- `increase` 和 `decrease` 使用 Lua 脚本把缺失初始化、TTL 设置和 `INCRBY` 计数更新合成一次 Redis 单 key 原子操作。
+- 命中更新时保留原剩余 TTL；缺失创建时使用调用传入的 TTL。
+- `increaseAndRefreshTtl` 和 `decreaseAndRefreshTtl` 使用同一类 Lua 脚本把缺失初始化、`INCRBY` 计数更新和命中 TTL 刷新合成一次 Redis 单 key 原子操作。
+- `get` 只解析原生 signed long 文本；如果内部计数 key 存在但不是整数，或没有 TTL，抛出 `IllegalStateException`。
+- `RedisConfig.valueCodec` 只影响 `RedisCache`，不影响 `RedisCounter`。
+
 ## aifei 生命周期
 
-- `CachePlugin` 接收已经配置好的 `Cache` 实例。
-- 插件启动时将实例注册为 `Cache` 单例，使业务代码可以通过 `@Inject` 注入接口。
-- 插件停止时关闭实现了 `AutoCloseable` 的缓存实例。
+- `CachePlugin(Cache)` 接收已经配置好的 `Cache` 实例，并基于内置支持的缓存实现自动创建对应 `Counter`。`CaffeineCache` 对应 `CaffeineCounter`，`RedisCache` 对应 `RedisCounter`；其他缓存实现不属于项目支持范围，单参构造会拒绝自动创建。
+- 插件启动时将缓存和计数实例分别注册为 `Cache` 和 `Counter` 单例，使业务代码可以通过 `@Inject` 注入接口。
+- 插件停止时关闭实现了 `AutoCloseable` 的缓存和计数实例。
 - 插件启动和停止操作均为幂等操作，避免重复注册和重复关闭。
 
 ## 异常模型
 
-除普通 `get(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中返回 `null`，`exists(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中返回 `false`，以及 `remove(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中忽略外，参数校验失败统一抛出 `IllegalArgumentException`，包括参数为 `null`、空白字符串、`key` 包含冒号、TTL 非法等场景。
+除普通 `get(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中返回 `null`，`exists(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中返回 `false`，`remove(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中忽略，`Counter.get(counterName, key)` 的非法参数按未命中返回 `null`，以及 `Counter.remove(counterName, key)` 的非法参数按未命中忽略外，参数校验失败统一抛出 `IllegalArgumentException`，包括参数为 `null`、空白字符串、`key` 包含冒号、TTL 非法、`step` 非法等场景。
 
 项目不提供缓存专用公共异常类型。Caffeine、Jedis、Redis value codec、JDK 标准库或其他底层库抛出的运行时异常按原始类型传播。缓存未命中不是异常。
 
@@ -175,7 +243,8 @@ public interface Cache {
 ## 演进约束
 
 - 优先保证 `Cache` 接口稳定、清晰和实现无关。
-- 两种实现的公共行为必须一致；无法一致实现的能力不应直接加入公共接口。
+- 优先保证 `Counter` 接口稳定、清晰和实现无关。
+- 两种缓存实现的公共行为必须一致，两种计数实现的公共行为必须一致；无法一致实现的能力不应直接加入公共接口。
 - 不为尚未出现的需求预先增加复杂抽象。
 - 任何会改变公共行为的设计决策都应先更新本文档，再落实到代码和测试。
 - README 只保留面向使用者的说明，详细设计决策统一维护在本文档中。
@@ -186,5 +255,6 @@ public interface Cache {
 - 无 TTL 的永久缓存条目。
 - Loader 防缓存击穿。
 - 批量读写、统计、刷新、按访问自动续期。
+- Counter 的存在性判断、续期和命名空间清理。
 - 原子命名空间清理。
 - Redis Cluster 分片节点的遍历清理。

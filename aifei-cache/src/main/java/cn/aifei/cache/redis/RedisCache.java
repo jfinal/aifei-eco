@@ -7,7 +7,9 @@
 package cn.aifei.cache.redis;
 
 import cn.aifei.cache.Cache;
+import cn.aifei.cache.Counter;
 import cn.aifei.cache.internal.CacheValidator;
+import cn.aifei.cache.internal.CounterFactory;
 import redis.clients.jedis.RedisClient;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.params.SetParams;
@@ -17,16 +19,18 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * 基于 Redis 的分布式缓存实现。
  */
-public class RedisCache implements Cache, AutoCloseable {
+public class RedisCache implements Cache, AutoCloseable, CounterFactory {
 
     private static final int SCAN_COUNT = 1_000;
 
     private final RedisClient client;
     private final RedisValueCodec codec;
+    private final Supplier<Counter> counterFactory;
     private boolean closed;
 
     /**
@@ -35,6 +39,7 @@ public class RedisCache implements Cache, AutoCloseable {
     public RedisCache() {
         this.codec = RedisConfig.defaultValueCodec();
         this.client = RedisClient.create();
+        this.counterFactory = RedisCounter::new;
     }
 
     /**
@@ -43,24 +48,35 @@ public class RedisCache implements Cache, AutoCloseable {
     public RedisCache(String host, int port) {
         this.codec = RedisConfig.defaultValueCodec();
         this.client = RedisClient.create(host, port);
+        this.counterFactory = () -> new RedisCounter(host, port);
     }
 
     /**
      * 使用指定 URI 连接 Redis。
      */
     public RedisCache(URI redisUri) {
-        Objects.requireNonNull(redisUri, "redisUri can not be null");
+        URI validRedisUri = Objects.requireNonNull(redisUri, "redisUri can not be null");
         this.codec = RedisConfig.defaultValueCodec();
-        this.client = RedisClient.create(redisUri);
+        this.client = RedisClient.create(validRedisUri);
+        this.counterFactory = () -> new RedisCounter(validRedisUri);
     }
 
     /**
      * 使用指定配置连接 Redis。
      */
     public RedisCache(RedisConfig config) {
-        Objects.requireNonNull(config, "config can not be null");
-        this.codec = config.createValueCodec();
-        this.client = config.createClient();
+        RedisConfig configSnapshot = Objects.requireNonNull(config, "config can not be null").copy();
+        this.codec = configSnapshot.createValueCodec();
+        this.client = configSnapshot.createClient();
+        this.counterFactory = () -> new RedisCounter(configSnapshot.copy());
+    }
+
+    /**
+     * 创建使用相同 Redis 连接配置的计数器。
+     */
+    @Override
+    public Counter createCounter() {
+        return counterFactory.get();
     }
 
     /**

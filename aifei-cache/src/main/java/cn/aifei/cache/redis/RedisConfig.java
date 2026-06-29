@@ -385,6 +385,49 @@ public class RedisConfig {
     }
 
     /**
+     * 复制当前配置，供缓存与计数器共享同一组装配参数。
+     */
+    RedisConfig copy() {
+        RedisConfig copy = new RedisConfig();
+        copy.redisUri = redisUri;
+        copy.host = host;
+        copy.port = port;
+        copy.user = user;
+        copy.password = password;
+        copy.database = database;
+        copy.clientName = clientName;
+        copy.ssl = ssl;
+        copy.sslSocketFactory = sslSocketFactory;
+        copy.sslParameters = sslParameters;
+        copy.hostnameVerifier = hostnameVerifier;
+        copy.resp3 = resp3;
+        copy.timeoutMillis = timeoutMillis;
+        copy.connectionTimeoutMillis = connectionTimeoutMillis;
+        copy.socketTimeoutMillis = socketTimeoutMillis;
+        copy.blockingSocketTimeoutMillis = blockingSocketTimeoutMillis;
+        copy.maxTotal = maxTotal;
+        copy.maxIdle = maxIdle;
+        copy.minIdle = minIdle;
+        copy.maxWaitMillis = maxWaitMillis;
+        copy.blockWhenExhausted = blockWhenExhausted;
+        copy.lifo = lifo;
+        copy.fairness = fairness;
+        copy.testOnCreate = testOnCreate;
+        copy.testOnBorrow = testOnBorrow;
+        copy.testOnReturn = testOnReturn;
+        copy.testWhileIdle = testWhileIdle;
+        copy.timeBetweenEvictionRunsMillis = timeBetweenEvictionRunsMillis;
+        copy.minEvictableIdleTimeMillis = minEvictableIdleTimeMillis;
+        copy.softMinEvictableIdleTimeMillis = softMinEvictableIdleTimeMillis;
+        copy.numTestsPerEvictionRun = numTestsPerEvictionRun;
+        copy.jmxEnabled = jmxEnabled;
+        copy.jmxNamePrefix = jmxNamePrefix;
+        copy.jmxNameBase = jmxNameBase;
+        copy.valueCodec = valueCodec;
+        return copy;
+    }
+
+    /**
      * 根据当前配置创建 RedisClient。
      */
     RedisClient createClient() {

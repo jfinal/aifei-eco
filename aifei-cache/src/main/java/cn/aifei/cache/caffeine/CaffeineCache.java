@@ -7,7 +7,9 @@
 package cn.aifei.cache.caffeine;
 
 import cn.aifei.cache.Cache;
+import cn.aifei.cache.Counter;
 import cn.aifei.cache.internal.CacheValidator;
+import cn.aifei.cache.internal.CounterFactory;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Policy;
 import com.github.benmanes.caffeine.cache.Ticker;
@@ -21,12 +23,14 @@ import java.util.concurrent.TimeUnit;
 /**
  * 基于 Caffeine 的进程内缓存实现。
  */
-public class CaffeineCache implements Cache {
+public class CaffeineCache implements Cache, CounterFactory {
 
     public static final long DEFAULT_MAXIMUM_SIZE = 10_000L;
 
     private final com.github.benmanes.caffeine.cache.Cache<CaffeineCacheKey, Object> cache;
     private final Policy.VarExpiration<CaffeineCacheKey, Object> expiration;
+    private final long maximumSize;
+    private final Ticker ticker;
 
     /**
      * 使用默认容量创建缓存。
@@ -51,16 +55,26 @@ public class CaffeineCache implements Cache {
         if (maximumSize <= 0) {
             throw new IllegalArgumentException("maximumSize must be greater than zero");
         }
+        this.maximumSize = maximumSize;
+        this.ticker = Objects.requireNonNull(ticker, "ticker can not be null");
 
         this.cache = Caffeine.newBuilder()
                 .maximumSize(maximumSize)
-                .ticker(Objects.requireNonNull(ticker, "ticker can not be null"))
+                .ticker(this.ticker)
                 .expireAfter(CaffeineExpiry.INSTANCE)
                 .build();
 
         this.expiration = cache.policy()
                 .expireVariably()
                 .orElseThrow(() -> new IllegalStateException("Variable expiration is not available"));
+    }
+
+    /**
+     * 创建使用相同 Caffeine 配置的计数器。
+     */
+    @Override
+    public Counter createCounter() {
+        return new CaffeineCounter(maximumSize, ticker);
     }
 
     /**
