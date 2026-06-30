@@ -10,4 +10,4 @@
     });
 ```
 
-注意：缓存尽可能使用全新设计的 aifei-cache 而非 aifei-redis。前者面向应用场景而设计，后者仅针对 jedis 已有 API 进行薄封装。
+注意：缓存尽可能使用全新设计的 aifei-cache 而非 aifei-redis。前者面向应用场景而设计且支持 Caffeine 与 Redis，后者仅针对 jedis 已有 API 进行薄封装。
