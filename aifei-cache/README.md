@@ -183,7 +183,7 @@ if (draft != null) {
 }
 ```
 
-`cacheName` 不能为空白并可使用冒号分级，`key` 不能为空白且不能包含冒号。`clear("user")` 会同时清理 `user:profile` 等下级缓存。所有写入和续期都必须指定大于零的 TTL。缓存未命中、条目过期，或普通 `get` 收到非法 `cacheName`/`key` 时，返回 `null`。`exists` 在缓存项存在且未过期时返回 `true`，缓存项不存在、已过期或收到非法 `cacheName`/`key` 时返回 `false`。`putIfAbsent` 只在缓存项不存在或已过期时写入并返回 `true`；缓存项存在且未过期时不覆盖原值、不重置原 TTL，并返回 `false`。`expire` 只在缓存项存在且未过期时重设剩余有效期并返回 `true`，不读取、不修改缓存值；缓存项不存在或已过期时返回 `false`。`remove` 收到非法 `cacheName`/`key` 时按未命中处理，不删除任何缓存项。除普通 `get`、`exists` 和 `remove` 的非法 `cacheName`/`key` 外，参数校验失败统一抛出 `IllegalArgumentException`。
+`cacheName` 和 `key` 不能为空白，均可使用冒号分级。`clear("user")` 会同时清理 `user:profile` 等下级缓存。所有写入和续期都必须指定大于零的 TTL。缓存未命中、条目过期，或普通 `get` 收到非法 `cacheName`/`key` 时，返回 `null`。`exists` 在缓存项存在且未过期时返回 `true`，缓存项不存在、已过期或收到非法 `cacheName`/`key` 时返回 `false`。`putIfAbsent` 只在缓存项不存在或已过期时写入并返回 `true`；缓存项存在且未过期时不覆盖原值、不重置原 TTL，并返回 `false`。`expire` 只在缓存项存在且未过期时重设剩余有效期并返回 `true`，不读取、不修改缓存值；缓存项不存在或已过期时返回 `false`。`remove` 收到非法 `cacheName`/`key` 时按未命中处理，不删除任何缓存项。除普通 `get`、`exists` 和 `remove` 的非法 `cacheName`/`key` 外，参数校验失败统一抛出 `IllegalArgumentException`。
 
 通过 Loader 可以在缓存未命中时加载、缓存并返回数据：
 
@@ -229,7 +229,7 @@ public interface Counter {
 }
 ```
 
-`counterName` 不能为空白并可使用冒号分级，`key` 不能为空白且不能包含冒号。计数项不存在或已过期时，`get` 返回 `null`，增减方法按当前值 `0` 创建新计数项并使用传入 TTL。`step` 必须大于零，超过 `long` 范围时抛出 `ArithmeticException`。
+`counterName` 和 `key` 不能为空白，均可使用冒号分级。计数项不存在或已过期时，`get` 返回 `null`，增减方法按当前值 `0` 创建新计数项并使用传入 TTL。`step` 必须大于零，超过 `long` 范围时抛出 `ArithmeticException`。
 
 ### 固定窗口计数
 

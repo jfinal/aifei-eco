@@ -24,7 +24,7 @@ public final class CacheValidator {
      * 判断缓存名称与缓存键是否有效。
      */
     public static boolean isValidCacheNameAndKey(String cacheName, String key) {
-        return !StrUtil.isBlank(cacheName) && !StrUtil.isBlank(key) && key.indexOf(':') == -1;
+        return !StrUtil.isBlank(cacheName) && !StrUtil.isBlank(key);
     }
 
     /**
@@ -55,14 +55,11 @@ public final class CacheValidator {
     }
 
     /**
-     * 校验缓存键非空且不包含冒号。
+     * 校验缓存键非空白。
      */
     public static String requireKey(String key) {
         if (StrUtil.isBlank(key)) {
             throw new IllegalArgumentException("key can not be blank");
-        }
-        if (key.indexOf(':') != -1) {
-            throw new IllegalArgumentException("key can not contain ':'");
         }
         return key;
     }

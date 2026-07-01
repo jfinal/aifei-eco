@@ -67,7 +67,6 @@ public abstract class CacheContractTest {
         assertNull(cache.get("cache", null));
         assertNull(cache.get("cache", ""));
         assertNull(cache.get("cache", " "));
-        assertNull(cache.get("cache", "key:1"));
     }
 
     /**
@@ -83,7 +82,6 @@ public abstract class CacheContractTest {
         cache.remove("cache", null);
         cache.remove("cache", "");
         cache.remove("cache", " ");
-        cache.remove("cache", "key:1");
 
         assertEquals("value", cache.get("cache", "key"));
     }
@@ -175,7 +173,6 @@ public abstract class CacheContractTest {
         assertFalse(cache.exists("cache", null));
         assertFalse(cache.exists("cache", ""));
         assertFalse(cache.exists("cache", " "));
-        assertFalse(cache.exists("cache", "key:1"));
     }
 
     /**
@@ -307,6 +304,23 @@ public abstract class CacheContractTest {
     }
 
     /**
+     * 验证缓存键可以包含冒号。
+     */
+    @Test
+    public void shouldSupportColonInCacheKeys() {
+        cache.put("user", "manager:123", "James", Duration.ofMinutes(1));
+
+        assertEquals("James", cache.get("user", "manager:123"));
+        assertTrue(cache.exists("user", "manager:123"));
+        assertFalse(cache.putIfAbsent("user", "manager:123", "Other", Duration.ofMinutes(1)));
+        assertTrue(cache.expire("user", "manager:123", Duration.ofMinutes(2)));
+
+        cache.remove("user", "manager:123");
+
+        assertNull(cache.get("user", "manager:123"));
+    }
+
+    /**
      * 验证覆盖写入会重置 TTL。
      */
     @Test
@@ -416,6 +430,7 @@ public abstract class CacheContractTest {
     public void shouldClearSpecifiedNamespaceAndChildren() {
         cache.put("users", "1", "James", Duration.ofMinutes(1));
         cache.put("users", "2", "Lucy", Duration.ofMinutes(1));
+        cache.put("users", "manager:123", "Manager", Duration.ofMinutes(1));
         cache.put("users:profile", "1", "Profile", Duration.ofMinutes(1));
         cache.put("users2", "1", "Other User", Duration.ofMinutes(1));
         cache.put("articles", "1", "Cache Design", Duration.ofMinutes(1));
@@ -425,6 +440,7 @@ public abstract class CacheContractTest {
 
         assertNull(cache.get("users", "1"));
         assertNull(cache.get("users", "2"));
+        assertNull(cache.get("users", "manager:123"));
         assertNull(cache.get("users:profile", "1"));
         assertEquals("Other User", cache.get("users2", "1"));
         assertEquals("Cache Design", cache.get("articles", "1"));
@@ -456,8 +472,6 @@ public abstract class CacheContractTest {
         Duration ttl = Duration.ofMinutes(1);
 
         assertThrows(IllegalArgumentException.class, () -> cache.put("cache", "key", null, ttl));
-        assertThrows(IllegalArgumentException.class,
-                () -> cache.put("cache", "key:1", "value", ttl));
         assertThrows(IllegalArgumentException.class, () -> cache.put("cache", "key", "value", null));
         assertThrows(IllegalArgumentException.class,
                 () -> cache.put("cache", "key", "value", Duration.ZERO));
@@ -472,8 +486,6 @@ public abstract class CacheContractTest {
 
         assertThrows(IllegalArgumentException.class,
                 () -> cache.putIfAbsent("cache", "key", null, ttl));
-        assertThrows(IllegalArgumentException.class,
-                () -> cache.putIfAbsent("cache", "key:1", "value", ttl));
         assertThrows(IllegalArgumentException.class,
                 () -> cache.putIfAbsent("cache", "key", "value", null));
         assertThrows(IllegalArgumentException.class,
@@ -499,8 +511,6 @@ public abstract class CacheContractTest {
                 () -> cache.expire("cache", "", ttl));
         assertThrows(IllegalArgumentException.class,
                 () -> cache.expire("cache", " ", ttl));
-        assertThrows(IllegalArgumentException.class,
-                () -> cache.expire("cache", "key:1", ttl));
         assertThrows(IllegalArgumentException.class,
                 () -> cache.expire("cache", "key", null));
         assertThrows(IllegalArgumentException.class,
@@ -538,8 +548,6 @@ public abstract class CacheContractTest {
                 () -> cache.get("cache", "", ttl, () -> "value-" + loads.incrementAndGet()));
         assertThrows(IllegalArgumentException.class,
                 () -> cache.get("cache", " ", ttl, () -> "value-" + loads.incrementAndGet()));
-        assertThrows(IllegalArgumentException.class,
-                () -> cache.get("cache", "key:1", ttl, () -> "value-" + loads.incrementAndGet()));
         assertEquals(0, loads.get());
 
         assertThrows(IllegalArgumentException.class, () -> cache.clear(null));

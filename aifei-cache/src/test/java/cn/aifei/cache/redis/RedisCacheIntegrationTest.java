@@ -65,7 +65,7 @@ public class RedisCacheIntegrationTest {
         String testId = UUID.randomUUID().toString();
         String rootCacheName = "integration-" + testId;
         String cacheName = rootCacheName + ":用户*?[x]\\路径/空 格";
-        String key = "键*?[x]/空 格";
+        String key = "键:分段*?[x]/空 格";
 
         cache.put(cacheName, key, "value", Duration.ofMillis(150));
         assertEquals("value", cache.get(cacheName, key));
@@ -93,6 +93,7 @@ public class RedisCacheIntegrationTest {
 
         cache.put(cacheName, "1", "one", Duration.ofMinutes(1));
         cache.put(cacheName, "2", "two", Duration.ofMinutes(1));
+        cache.put(cacheName, "manager:123", "manager", Duration.ofMinutes(1));
         String otherCacheName = rootCacheName + ":other";
         String siblingCacheName = rootCacheName + "-sibling";
         cache.put(otherCacheName, "1", "other", Duration.ofMinutes(1));
@@ -102,6 +103,7 @@ public class RedisCacheIntegrationTest {
 
         assertNull(cache.get(cacheName, "1"));
         assertNull(cache.get(cacheName, "2"));
+        assertNull(cache.get(cacheName, "manager:123"));
         assertFalse(cache.exists(cacheName, "1"));
         assertFalse(cache.exists(cacheName, "2"));
         assertEquals("other", cache.get(otherCacheName, "1"));

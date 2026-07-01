@@ -40,7 +40,6 @@ public class RedisCacheTest {
             assertNull(redisCache.get("cache", null));
             assertNull(redisCache.get("cache", ""));
             assertNull(redisCache.get("cache", " "));
-            assertNull(redisCache.get("cache", "key:1"));
         } finally {
             redisCache.close();
         }
@@ -59,7 +58,6 @@ public class RedisCacheTest {
             assertFalse(redisCache.exists("cache", null));
             assertFalse(redisCache.exists("cache", ""));
             assertFalse(redisCache.exists("cache", " "));
-            assertFalse(redisCache.exists("cache", "key:1"));
         } finally {
             redisCache.close();
         }
@@ -85,8 +83,6 @@ public class RedisCacheTest {
                     () -> redisCache.putIfAbsent("cache", "", "value", ttl));
             assertThrows(IllegalArgumentException.class,
                     () -> redisCache.putIfAbsent("cache", " ", "value", ttl));
-            assertThrows(IllegalArgumentException.class,
-                    () -> redisCache.putIfAbsent("cache", "key:1", "value", ttl));
             assertThrows(IllegalArgumentException.class,
                     () -> redisCache.putIfAbsent("cache", "key", null, ttl));
             assertThrows(IllegalArgumentException.class,
@@ -118,8 +114,6 @@ public class RedisCacheTest {
                     () -> redisCache.expire("cache", "", ttl));
             assertThrows(IllegalArgumentException.class,
                     () -> redisCache.expire("cache", " ", ttl));
-            assertThrows(IllegalArgumentException.class,
-                    () -> redisCache.expire("cache", "key:1", ttl));
             assertThrows(IllegalArgumentException.class,
                     () -> redisCache.expire("cache", "key", null));
             assertThrows(IllegalArgumentException.class,

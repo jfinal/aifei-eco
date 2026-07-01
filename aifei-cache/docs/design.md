@@ -120,7 +120,7 @@ public interface Counter {
 
 ### 参数与返回值
 
-- `cacheName` 和 `key` 是区分大小写的非空白字符串。`cacheName` 可用冒号分级，`key` 不能包含冒号。
+- `cacheName` 和 `key` 是区分大小写的非空白字符串，均可用冒号分级。
 - `counterName` 与 `cacheName` 遵循相同命名规则。
 - `value` 不能为 `null`。
 - `ttl` 不能为 `null`，转换为毫秒后必须大于零。
@@ -204,7 +204,7 @@ public interface Counter {
 - `RedisConfig.maxTotal(-1)` 表示连接池最大连接数不限制。`maxWaitMillis`、`timeBetweenEvictionRunsMillis`、`minEvictableIdleTimeMillis` 和 `softMinEvictableIdleTimeMillis` 的 `-1` 语义与 commons-pool 保持一致。
 - 当同时配置 URI 和其他客户端参数时，URI 提供基础连接信息，显式设置的 user、password、database、clientName、SSL 和超时参数覆盖 URI 中对应的客户端配置。
 - `RedisCache` 的无参、host/port 与 URI 便捷构造器均复用 `RedisConfig` 默认装配，避免便捷构造器与配置对象构造器出现不同默认行为。`RedisCounter` 不提供独立连接构造器，只由 `RedisCache` 在插件装配链路中创建。
-- 物理 key 格式为 `{cacheName}:{key}`。`clear` 扫描时会转义 Redis glob 特殊字符；清理父级名称时也会清理其下级名称。
+- 物理 key 格式为 `{cacheName}:{key}`。`clear` 扫描时会转义 Redis glob 特殊字符；清理父级名称时也会清理其下级名称。调用方应避免使用会在 Redis 物理 key 上产生相同拼接结果的 `cacheName` 和 `key` 组合。
 - 默认 value codec 使用 Fury `CompatibleMode.COMPATIBLE` 序列化为二进制数据，支持滚动发布期间常见的 POJO 字段增删。
 - 默认 Fury codec 启用引用跟踪，支持缓存快照中的共享引用和循环引用；数字编码使用 Fury 默认压缩策略，不关闭 number compression。
 - 默认 Fury codec 未强制类注册，因此使用默认 codec 时 Redis 必须是可信内部服务，不允许不可信方写入缓存数据。
@@ -225,7 +225,7 @@ public interface Counter {
 
 - 使用独立 Redis key 命名空间和 Redis 原生 integer value，不经过 `RedisValueCodec`。
 - 不直接创建、拥有或关闭 Redis 客户端；Redis 连接生命周期由创建它的 `RedisCache` 管理。
-- 计数物理 key 使用内部前缀，与 `RedisCache` 的 `{cacheName}:{key}` 普通缓存 key 隔离。
+- 计数物理 key 使用内部前缀，与 `RedisCache` 的普通缓存 key 隔离。调用方应避免使用会在 Redis 计数物理 key 上产生相同拼接结果的 `counterName` 和 `key` 组合。
 - `increase` 和 `decrease` 使用 Lua 脚本把缺失初始化、TTL 设置和 `INCRBY` 计数更新合成一次 Redis 单 key 原子操作。
 - 命中更新时保留原剩余 TTL；缺失创建时使用调用传入的 TTL。
 - `increaseAndRefreshTtl` 和 `decreaseAndRefreshTtl` 使用同一类 Lua 脚本把缺失初始化、`INCRBY` 计数更新和命中 TTL 刷新合成一次 Redis 单 key 原子操作。
@@ -241,7 +241,7 @@ public interface Counter {
 
 ## 异常模型
 
-除普通 `get(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中返回 `null`，`exists(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中返回 `false`，`remove(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中忽略，`Counter.get(counterName, key)` 的非法参数按未命中返回 `null`，以及 `Counter.remove(counterName, key)` 的非法参数按未命中忽略外，参数校验失败统一抛出 `IllegalArgumentException`，包括参数为 `null`、空白字符串、`key` 包含冒号、TTL 非法、`step` 非法等场景。
+除普通 `get(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中返回 `null`，`exists(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中返回 `false`，`remove(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中忽略，`Counter.get(counterName, key)` 的非法参数按未命中返回 `null`，以及 `Counter.remove(counterName, key)` 的非法参数按未命中忽略外，参数校验失败统一抛出 `IllegalArgumentException`，包括参数为 `null`、空白字符串、TTL 非法、`step` 非法等场景。
 
 项目不提供缓存专用公共异常类型。Caffeine、Jedis、Redis value codec、JDK 标准库或其他底层库抛出的运行时异常按原始类型传播。缓存未命中不是异常。
 

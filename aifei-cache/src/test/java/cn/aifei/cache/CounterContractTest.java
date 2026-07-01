@@ -66,7 +66,6 @@ public abstract class CounterContractTest {
         assertNull(counter.get("counter", null));
         assertNull(counter.get("counter", ""));
         assertNull(counter.get("counter", " "));
-        assertNull(counter.get("counter", "key:1"));
     }
 
     /**
@@ -83,7 +82,6 @@ public abstract class CounterContractTest {
         counter.remove(counterName, null);
         counter.remove(counterName, "");
         counter.remove(counterName, " ");
-        counter.remove(counterName, "key:1");
 
         assertEquals(Long.valueOf(1L), counter.get(counterName, "views"));
     }
@@ -255,6 +253,22 @@ public abstract class CounterContractTest {
     }
 
     /**
+     * 验证计数键可以包含冒号。
+     */
+    @Test
+    public void shouldSupportColonInCounterKeys() {
+        String counters = counterName("counters");
+
+        assertEquals(1L, counter.increase(counters, "views:2026:07", 1L, Duration.ofMinutes(1)));
+        assertEquals(3L, counter.increase(counters, "views:2026:07", 2L, Duration.ofMinutes(1)));
+        assertEquals(Long.valueOf(3L), counter.get(counters, "views:2026:07"));
+
+        counter.remove(counters, "views:2026:07");
+
+        assertNull(counter.get(counters, "views:2026:07"));
+    }
+
+    /**
      * 验证计数溢出会抛出异常。
      */
     @Test
@@ -306,8 +320,6 @@ public abstract class CounterContractTest {
         assertThrows(IllegalArgumentException.class,
                 () -> counter.increase("counter", " ", 1L, ttl));
         assertThrows(IllegalArgumentException.class,
-                () -> counter.increase("counter", "key:1", 1L, ttl));
-        assertThrows(IllegalArgumentException.class,
                 () -> counter.increase("counter", "key", 0L, ttl));
         assertThrows(IllegalArgumentException.class,
                 () -> counter.increase("counter", "key", -1L, ttl));
@@ -334,8 +346,6 @@ public abstract class CounterContractTest {
                 () -> counter.increaseAndRefreshTtl("counter", "", 1L, ttl));
         assertThrows(IllegalArgumentException.class,
                 () -> counter.increaseAndRefreshTtl("counter", " ", 1L, ttl));
-        assertThrows(IllegalArgumentException.class,
-                () -> counter.increaseAndRefreshTtl("counter", "key:1", 1L, ttl));
         assertThrows(IllegalArgumentException.class,
                 () -> counter.increaseAndRefreshTtl("counter", "key", 0L, ttl));
         assertThrows(IllegalArgumentException.class,
@@ -364,8 +374,6 @@ public abstract class CounterContractTest {
         assertThrows(IllegalArgumentException.class,
                 () -> counter.decrease("counter", " ", 1L, ttl));
         assertThrows(IllegalArgumentException.class,
-                () -> counter.decrease("counter", "key:1", 1L, ttl));
-        assertThrows(IllegalArgumentException.class,
                 () -> counter.decrease("counter", "key", 0L, ttl));
         assertThrows(IllegalArgumentException.class,
                 () -> counter.decrease("counter", "key", -1L, ttl));
@@ -392,8 +400,6 @@ public abstract class CounterContractTest {
                 () -> counter.decreaseAndRefreshTtl("counter", "", 1L, ttl));
         assertThrows(IllegalArgumentException.class,
                 () -> counter.decreaseAndRefreshTtl("counter", " ", 1L, ttl));
-        assertThrows(IllegalArgumentException.class,
-                () -> counter.decreaseAndRefreshTtl("counter", "key:1", 1L, ttl));
         assertThrows(IllegalArgumentException.class,
                 () -> counter.decreaseAndRefreshTtl("counter", "key", 0L, ttl));
         assertThrows(IllegalArgumentException.class,

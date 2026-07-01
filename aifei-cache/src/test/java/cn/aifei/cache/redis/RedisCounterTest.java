@@ -37,7 +37,6 @@ public class RedisCounterTest {
             assertNull(counter.get("counter", null));
             assertNull(counter.get("counter", ""));
             assertNull(counter.get("counter", " "));
-            assertNull(counter.get("counter", "key:1"));
 
             counter.remove(null, "key");
             counter.remove("", "key");
@@ -45,7 +44,6 @@ public class RedisCounterTest {
             counter.remove("counter", null);
             counter.remove("counter", "");
             counter.remove("counter", " ");
-            counter.remove("counter", "key:1");
 
             assertThrows(IllegalArgumentException.class,
                     () -> counter.increase(null, "key", 1L, ttl));
@@ -59,8 +57,6 @@ public class RedisCounterTest {
                     () -> counter.increase("counter", "", 1L, ttl));
             assertThrows(IllegalArgumentException.class,
                     () -> counter.increase("counter", " ", 1L, ttl));
-            assertThrows(IllegalArgumentException.class,
-                    () -> counter.increase("counter", "key:1", 1L, ttl));
             assertThrows(IllegalArgumentException.class,
                     () -> counter.increase("counter", "key", 0L, ttl));
             assertThrows(IllegalArgumentException.class,
@@ -83,8 +79,6 @@ public class RedisCounterTest {
             assertThrows(IllegalArgumentException.class,
                     () -> counter.increaseAndRefreshTtl("counter", " ", 1L, ttl));
             assertThrows(IllegalArgumentException.class,
-                    () -> counter.increaseAndRefreshTtl("counter", "key:1", 1L, ttl));
-            assertThrows(IllegalArgumentException.class,
                     () -> counter.increaseAndRefreshTtl("counter", "key", 0L, ttl));
             assertThrows(IllegalArgumentException.class,
                     () -> counter.increaseAndRefreshTtl("counter", "key", -1L, ttl));
@@ -106,8 +100,6 @@ public class RedisCounterTest {
             assertThrows(IllegalArgumentException.class,
                     () -> counter.decrease("counter", " ", 1L, ttl));
             assertThrows(IllegalArgumentException.class,
-                    () -> counter.decrease("counter", "key:1", 1L, ttl));
-            assertThrows(IllegalArgumentException.class,
                     () -> counter.decrease("counter", "key", 0L, ttl));
             assertThrows(IllegalArgumentException.class,
                     () -> counter.decrease("counter", "key", -1L, ttl));
@@ -128,8 +120,6 @@ public class RedisCounterTest {
                     () -> counter.decreaseAndRefreshTtl("counter", "", 1L, ttl));
             assertThrows(IllegalArgumentException.class,
                     () -> counter.decreaseAndRefreshTtl("counter", " ", 1L, ttl));
-            assertThrows(IllegalArgumentException.class,
-                    () -> counter.decreaseAndRefreshTtl("counter", "key:1", 1L, ttl));
             assertThrows(IllegalArgumentException.class,
                     () -> counter.decreaseAndRefreshTtl("counter", "key", 0L, ttl));
             assertThrows(IllegalArgumentException.class,

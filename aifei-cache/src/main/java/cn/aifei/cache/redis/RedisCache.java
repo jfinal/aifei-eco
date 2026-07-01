@@ -181,14 +181,17 @@ public class RedisCache implements Cache, AutoCloseable, CounterFactory {
     }
 
     /**
-     * 生成清理缓存时使用的匹配模式。
+     * 生成清理缓存时使用的 Redis glob 匹配模式。
+     *
+     * <p>模式只基于 cacheName 生成；key 即使包含冒号，也由末尾的 {@code *} 匹配。
+     * 冒号不是 Redis glob 特殊字符，不需要转义。</p>
      */
     private byte[] redisPattern(String cacheName) {
         return bytes(escapeRedisGlob(cacheName) + ":*");
     }
 
     /**
-     * 转义 Redis 匹配模式中的特殊字符。
+     * 转义 Redis glob 匹配模式中的特殊字符。
      */
     private static String escapeRedisGlob(String value) {
         StringBuilder escaped = new StringBuilder(value.length());
