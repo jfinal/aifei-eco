@@ -1,6 +1,8 @@
 package cn.aifei.cache.redis;
 
 import org.junit.Test;
+import redis.clients.jedis.ConnectionPoolConfig;
+import redis.clients.jedis.DefaultJedisClientConfig;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.JedisClientConfig;
 import redis.clients.jedis.RedisClient;
@@ -26,6 +28,8 @@ import static org.junit.Assert.fail;
  * 验证 Redis 缓存的本地行为。
  */
 public class RedisCacheTest {
+
+    private static final long DEFAULT_MAX_WAIT_MILLIS = 1_500L;
 
     /**
      * 验证非法普通读取不会访问 Redis。
@@ -190,7 +194,7 @@ public class RedisCacheTest {
     }
 
     /**
-     * 验证 RedisConfig 默认连接池配置适合普通应用开箱使用。
+     * 验证 RedisConfig 未显式配置连接池时，除 maxWaitMillis 外使用 Jedis 默认配置。
      */
     @Test
     public void shouldApplyDefaultPoolConfigToRedisClient() {
@@ -203,7 +207,7 @@ public class RedisCacheTest {
     }
 
     /**
-     * 验证 RedisConfig 默认客户端配置适合普通应用开箱使用。
+     * 验证 RedisConfig 未显式配置客户端参数时使用 Jedis 默认配置。
      */
     @Test
     public void shouldApplyDefaultClientConfigToRedisClient() throws Exception {
@@ -242,16 +246,21 @@ public class RedisCacheTest {
     }
 
     /**
-     * 验证默认启用 JMX 时，同一 JVM 内多个默认连接池不会互相冲突。
+     * 验证同一 JVM 内多个默认连接池不会发生 JMX 名称冲突。
      */
     @Test
-    public void shouldCreateMultipleDefaultClientsWithJmxEnabled() {
+    public void shouldCreateMultipleDefaultClientsWithoutJmxConflict() {
         RedisClient first = new RedisConfig().createClient();
         RedisClient second = new RedisConfig().createClient();
         try {
-            assertNotNull(first.getPool().getJmxName());
-            assertNotNull(second.getPool().getJmxName());
-            assertFalse(first.getPool().getJmxName().equals(second.getPool().getJmxName()));
+            if (new ConnectionPoolConfig().getJmxEnabled()) {
+                assertNotNull(first.getPool().getJmxName());
+                assertNotNull(second.getPool().getJmxName());
+                assertFalse(first.getPool().getJmxName().equals(second.getPool().getJmxName()));
+            } else {
+                assertNull(first.getPool().getJmxName());
+                assertNull(second.getPool().getJmxName());
+            }
         } finally {
             first.close();
             second.close();
@@ -346,30 +355,32 @@ public class RedisCacheTest {
     }
 
     /**
-     * 验证用户只降低最大连接数时，未显式配置的默认空闲上限会自动贴合。
+     * 验证只显式配置最大连接数时，不覆盖 Jedis 的其他容量默认值。
      */
     @Test
-    public void shouldAdaptDefaultMaxIdleWhenOnlyMaxTotalIsReduced() {
+    public void shouldOnlyApplyExplicitMaxTotal() {
+        ConnectionPoolConfig jedisDefault = new ConnectionPoolConfig();
         RedisClient client = new RedisConfig().maxTotal(4).createClient();
         try {
             assertEquals(4, client.getPool().getMaxTotal());
-            assertEquals(4, client.getPool().getMaxIdle());
-            assertEquals(1, client.getPool().getMinIdle());
+            assertEquals(jedisDefault.getMaxIdle(), client.getPool().getMaxIdle());
+            assertEquals(jedisDefault.getMinIdle(), client.getPool().getMinIdle());
         } finally {
             client.close();
         }
     }
 
     /**
-     * 验证用户只降低最大空闲连接数时，未显式配置的默认最小空闲数会自动贴合。
+     * 验证只显式配置最大空闲连接数时，不覆盖 Jedis 的其他容量默认值。
      */
     @Test
-    public void shouldAdaptDefaultMinIdleWhenOnlyMaxIdleIsReduced() {
+    public void shouldOnlyApplyExplicitMaxIdle() {
+        ConnectionPoolConfig jedisDefault = new ConnectionPoolConfig();
         RedisClient client = new RedisConfig().maxIdle(0).createClient();
         try {
-            assertEquals(32, client.getPool().getMaxTotal());
+            assertEquals(jedisDefault.getMaxTotal(), client.getPool().getMaxTotal());
             assertEquals(0, client.getPool().getMaxIdle());
-            assertEquals(0, client.getPool().getMinIdle());
+            assertEquals(jedisDefault.getMinIdle(), client.getPool().getMinIdle());
         } finally {
             client.close();
         }
@@ -453,17 +464,41 @@ public class RedisCacheTest {
     }
 
     /**
-     * 验证每轮空闲连接扫描数量必须为正数，避免后台校验被误配置为无效扫描。
+     * 验证连接池等待时间允许显式恢复 commons-pool 的无限等待语义。
+     */
+    @Test
+    public void shouldAllowInfiniteMaxWaitMillis() {
+        RedisClient client = new RedisConfig().maxWaitMillis(-1).createClient();
+        try {
+            assertEquals(-1, client.getPool().getMaxWaitDuration().toMillis());
+        } finally {
+            client.close();
+        }
+
+        IllegalArgumentException negative = assertThrows(IllegalArgumentException.class,
+                () -> new RedisConfig().maxWaitMillis(-2));
+        assertEquals("maxWaitMillis must be greater than or equal to -1", negative.getMessage());
+    }
+
+    /**
+     * 验证每轮空闲连接扫描数量允许 Jedis 默认的 -1，但拒绝其他非正数。
      */
     @Test
     public void shouldRejectInvalidNumTestsPerEvictionRun() {
+        RedisClient client = new RedisConfig().numTestsPerEvictionRun(-1).createClient();
+        try {
+            assertEquals(-1, client.getPool().getNumTestsPerEvictionRun());
+        } finally {
+            client.close();
+        }
+
         IllegalArgumentException zero = assertThrows(IllegalArgumentException.class,
                 () -> new RedisConfig().numTestsPerEvictionRun(0));
-        assertEquals("numTestsPerEvictionRun must be greater than 0", zero.getMessage());
+        assertEquals("numTestsPerEvictionRun must be -1 or greater than 0", zero.getMessage());
 
         IllegalArgumentException negative = assertThrows(IllegalArgumentException.class,
-                () -> new RedisConfig().numTestsPerEvictionRun(-1));
-        assertEquals("numTestsPerEvictionRun must be greater than 0", negative.getMessage());
+                () -> new RedisConfig().numTestsPerEvictionRun(-2));
+        assertEquals("numTestsPerEvictionRun must be -1 or greater than 0", negative.getMessage());
     }
 
     /**
@@ -550,15 +585,16 @@ public class RedisCacheTest {
     private static void assertDefaultClientConfig(RedisClient client, String host, int port) throws Exception {
         assertHostAndPort(client, host, port);
         JedisClientConfig clientConfig = readClientConfig(client);
-        assertEquals(2000, clientConfig.getConnectionTimeoutMillis());
-        assertEquals(2000, clientConfig.getSocketTimeoutMillis());
-        assertEquals(0, clientConfig.getBlockingSocketTimeoutMillis());
-        assertNull(clientConfig.getUser());
-        assertNull(clientConfig.getPassword());
-        assertEquals(0, clientConfig.getDatabase());
-        assertNull(clientConfig.getClientName());
-        assertFalse(clientConfig.isSsl());
-        assertNull(clientConfig.getRedisProtocol());
+        JedisClientConfig jedisDefault = DefaultJedisClientConfig.builder().build();
+        assertEquals(jedisDefault.getConnectionTimeoutMillis(), clientConfig.getConnectionTimeoutMillis());
+        assertEquals(jedisDefault.getSocketTimeoutMillis(), clientConfig.getSocketTimeoutMillis());
+        assertEquals(jedisDefault.getBlockingSocketTimeoutMillis(), clientConfig.getBlockingSocketTimeoutMillis());
+        assertEquals(jedisDefault.getUser(), clientConfig.getUser());
+        assertEquals(jedisDefault.getPassword(), clientConfig.getPassword());
+        assertEquals(jedisDefault.getDatabase(), clientConfig.getDatabase());
+        assertEquals(jedisDefault.getClientName(), clientConfig.getClientName());
+        assertEquals(jedisDefault.isSsl(), clientConfig.isSsl());
+        assertSame(jedisDefault.getRedisProtocol(), clientConfig.getRedisProtocol());
     }
 
     /**
@@ -571,26 +607,33 @@ public class RedisCacheTest {
     }
 
     /**
-     * 验证项目层定义的 Redis 连接池默认值。
+     * 验证默认 Redis 连接池配置除 maxWaitMillis 外与 Jedis ConnectionPoolConfig 保持一致。
      */
     private static void assertDefaultPoolConfig(RedisClient client) {
-        assertEquals(32, client.getPool().getMaxTotal());
-        assertEquals(16, client.getPool().getMaxIdle());
-        assertEquals(1, client.getPool().getMinIdle());
-        assertEquals(3000, client.getPool().getMaxWaitDuration().toMillis());
-        assertTrue(client.getPool().getBlockWhenExhausted());
-        assertTrue(client.getPool().getLifo());
-        assertFalse(client.getPool().getFairness());
-        assertFalse(client.getPool().getTestOnCreate());
-        assertFalse(client.getPool().getTestOnBorrow());
-        assertFalse(client.getPool().getTestOnReturn());
-        assertTrue(client.getPool().getTestWhileIdle());
-        assertEquals(60000, client.getPool().getDurationBetweenEvictionRuns().toMillis());
-        assertEquals(600000, client.getPool().getMinEvictableIdleDuration().toMillis());
-        assertEquals(120000, client.getPool().getSoftMinEvictableIdleDuration().toMillis());
-        assertEquals(8, client.getPool().getNumTestsPerEvictionRun());
-        assertNotNull(client.getPool().getJmxName());
-        assertTrue(String.valueOf(client.getPool().getJmxName()).contains("Aifei-Cache-Redis"));
+        ConnectionPoolConfig jedisDefault = new ConnectionPoolConfig();
+        assertEquals(jedisDefault.getMaxTotal(), client.getPool().getMaxTotal());
+        assertEquals(jedisDefault.getMaxIdle(), client.getPool().getMaxIdle());
+        assertEquals(jedisDefault.getMinIdle(), client.getPool().getMinIdle());
+        assertEquals(DEFAULT_MAX_WAIT_MILLIS, client.getPool().getMaxWaitDuration().toMillis());
+        assertEquals(jedisDefault.getBlockWhenExhausted(), client.getPool().getBlockWhenExhausted());
+        assertEquals(jedisDefault.getLifo(), client.getPool().getLifo());
+        assertEquals(jedisDefault.getFairness(), client.getPool().getFairness());
+        assertEquals(jedisDefault.getTestOnCreate(), client.getPool().getTestOnCreate());
+        assertEquals(jedisDefault.getTestOnBorrow(), client.getPool().getTestOnBorrow());
+        assertEquals(jedisDefault.getTestOnReturn(), client.getPool().getTestOnReturn());
+        assertEquals(jedisDefault.getTestWhileIdle(), client.getPool().getTestWhileIdle());
+        assertEquals(jedisDefault.getDurationBetweenEvictionRuns().toMillis(),
+                client.getPool().getDurationBetweenEvictionRuns().toMillis());
+        assertEquals(jedisDefault.getMinEvictableIdleDuration().toMillis(),
+                client.getPool().getMinEvictableIdleDuration().toMillis());
+        assertEquals(jedisDefault.getSoftMinEvictableIdleDuration().toMillis(),
+                client.getPool().getSoftMinEvictableIdleDuration().toMillis());
+        assertEquals(jedisDefault.getNumTestsPerEvictionRun(), client.getPool().getNumTestsPerEvictionRun());
+        if (jedisDefault.getJmxEnabled()) {
+            assertNotNull(client.getPool().getJmxName());
+        } else {
+            assertNull(client.getPool().getJmxName());
+        }
     }
 
     /**

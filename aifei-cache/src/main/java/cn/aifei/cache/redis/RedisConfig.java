@@ -24,23 +24,11 @@ import javax.net.ssl.SSLSocketFactory;
  */
 public class RedisConfig {
 
-    private static final String DEFAULT_HOST = Protocol.DEFAULT_HOST;
-    private static final int DEFAULT_PORT = Protocol.DEFAULT_PORT;
-    private static final int DEFAULT_TIMEOUT_MILLIS = 2_000;
-    private static final int DEFAULT_BLOCKING_SOCKET_TIMEOUT_MILLIS = 0;
-    private static final int DEFAULT_MAX_TOTAL = 32;
-    private static final int DEFAULT_MAX_IDLE = 16;
-    private static final int DEFAULT_MIN_IDLE = 1;
-    private static final long DEFAULT_MAX_WAIT_MILLIS = 3_000L;
-    private static final long DEFAULT_TIME_BETWEEN_EVICTION_RUNS_MILLIS = 60_000L;
-    private static final long DEFAULT_MIN_EVICTABLE_IDLE_TIME_MILLIS = 600_000L;
-    private static final long DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME_MILLIS = 120_000L;
-    private static final int DEFAULT_NUM_TESTS_PER_EVICTION_RUN = 8;
-    private static final String DEFAULT_JMX_NAME_PREFIX = "Aifei-Cache-Redis";
+    private static final long DEFAULT_MAX_WAIT_MILLIS = 1_500L;
 
     private URI redisUri;
-    private String host = DEFAULT_HOST;
-    private int port = DEFAULT_PORT;
+    private String host = Protocol.DEFAULT_HOST;
+    private int port = Protocol.DEFAULT_PORT;
     private String user;
     private String password;
     private Integer database;
@@ -50,29 +38,27 @@ public class RedisConfig {
     private SSLParameters sslParameters;
     private HostnameVerifier hostnameVerifier;
     private Boolean resp3;
-    private Integer timeoutMillis = DEFAULT_TIMEOUT_MILLIS;
+    private Integer timeoutMillis;
     private Integer connectionTimeoutMillis;
     private Integer socketTimeoutMillis;
-    private Integer blockingSocketTimeoutMillis = DEFAULT_BLOCKING_SOCKET_TIMEOUT_MILLIS;
-    private int maxTotal = DEFAULT_MAX_TOTAL;
-    private int maxIdle = DEFAULT_MAX_IDLE;
-    private int minIdle = DEFAULT_MIN_IDLE;
-    private boolean maxIdleConfigured;
-    private boolean minIdleConfigured;
-    private long maxWaitMillis = DEFAULT_MAX_WAIT_MILLIS;
-    private Boolean blockWhenExhausted = true;
-    private Boolean lifo = true;
-    private Boolean fairness = false;
-    private Boolean testOnCreate = false;
-    private Boolean testOnBorrow = false;
-    private Boolean testOnReturn = false;
-    private Boolean testWhileIdle = true;
-    private Long timeBetweenEvictionRunsMillis = DEFAULT_TIME_BETWEEN_EVICTION_RUNS_MILLIS;
-    private Long minEvictableIdleTimeMillis = DEFAULT_MIN_EVICTABLE_IDLE_TIME_MILLIS;
-    private Long softMinEvictableIdleTimeMillis = DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME_MILLIS;
-    private Integer numTestsPerEvictionRun = DEFAULT_NUM_TESTS_PER_EVICTION_RUN;
-    private Boolean jmxEnabled = true;
-    private String jmxNamePrefix = DEFAULT_JMX_NAME_PREFIX;
+    private Integer blockingSocketTimeoutMillis;
+    private Integer maxTotal;
+    private Integer maxIdle;
+    private Integer minIdle;
+    private Long maxWaitMillis = DEFAULT_MAX_WAIT_MILLIS;
+    private Boolean blockWhenExhausted;
+    private Boolean lifo;
+    private Boolean fairness;
+    private Boolean testOnCreate;
+    private Boolean testOnBorrow;
+    private Boolean testOnReturn;
+    private Boolean testWhileIdle;
+    private Long timeBetweenEvictionRunsMillis;
+    private Long minEvictableIdleTimeMillis;
+    private Long softMinEvictableIdleTimeMillis;
+    private Integer numTestsPerEvictionRun;
+    private Boolean jmxEnabled;
+    private String jmxNamePrefix;
     private String jmxNameBase;
     private RedisValueCodec valueCodec;
 
@@ -213,8 +199,7 @@ public class RedisConfig {
      * 设置阻塞命令 socket 超时时间，单位毫秒。0 表示不超时。
      */
     public RedisConfig blockingSocketTimeoutMillis(int blockingSocketTimeoutMillis) {
-        this.blockingSocketTimeoutMillis =
-                requireNonNegative(blockingSocketTimeoutMillis, "blockingSocketTimeoutMillis");
+        this.blockingSocketTimeoutMillis = requireNonNegative(blockingSocketTimeoutMillis, "blockingSocketTimeoutMillis");
         return this;
     }
 
@@ -237,7 +222,6 @@ public class RedisConfig {
             throw new IllegalArgumentException("maxIdle must be greater than or equal to 0");
         }
         this.maxIdle = maxIdle;
-        this.maxIdleConfigured = true;
         return this;
     }
 
@@ -249,7 +233,6 @@ public class RedisConfig {
             throw new IllegalArgumentException("minIdle must be greater than or equal to 0");
         }
         this.minIdle = minIdle;
-        this.minIdleConfigured = true;
         return this;
     }
 
@@ -357,10 +340,13 @@ public class RedisConfig {
     }
 
     /**
-     * 设置每次空闲连接扫描检查的连接数量。
+     * 设置每次空闲连接扫描检查的连接数量。-1 表示检查全部空闲连接。
      */
     public RedisConfig numTestsPerEvictionRun(int numTestsPerEvictionRun) {
-        this.numTestsPerEvictionRun = requirePositive(numTestsPerEvictionRun, "numTestsPerEvictionRun");
+        if (numTestsPerEvictionRun != -1 && numTestsPerEvictionRun <= 0) {
+            throw new IllegalArgumentException("numTestsPerEvictionRun must be -1 or greater than 0");
+        }
+        this.numTestsPerEvictionRun = numTestsPerEvictionRun;
         return this;
     }
 
@@ -394,51 +380,6 @@ public class RedisConfig {
     public RedisConfig valueCodec(RedisValueCodec valueCodec) {
         this.valueCodec = Objects.requireNonNull(valueCodec, "valueCodec can not be null");
         return this;
-    }
-
-    /**
-     * 复制当前配置，供缓存与计数器共享同一组装配参数。
-     */
-    RedisConfig copy() {
-        RedisConfig copy = new RedisConfig();
-        copy.redisUri = redisUri;
-        copy.host = host;
-        copy.port = port;
-        copy.user = user;
-        copy.password = password;
-        copy.database = database;
-        copy.clientName = clientName;
-        copy.ssl = ssl;
-        copy.sslSocketFactory = sslSocketFactory;
-        copy.sslParameters = sslParameters;
-        copy.hostnameVerifier = hostnameVerifier;
-        copy.resp3 = resp3;
-        copy.timeoutMillis = timeoutMillis;
-        copy.connectionTimeoutMillis = connectionTimeoutMillis;
-        copy.socketTimeoutMillis = socketTimeoutMillis;
-        copy.blockingSocketTimeoutMillis = blockingSocketTimeoutMillis;
-        copy.maxTotal = maxTotal;
-        copy.maxIdle = maxIdle;
-        copy.minIdle = minIdle;
-        copy.maxIdleConfigured = maxIdleConfigured;
-        copy.minIdleConfigured = minIdleConfigured;
-        copy.maxWaitMillis = maxWaitMillis;
-        copy.blockWhenExhausted = blockWhenExhausted;
-        copy.lifo = lifo;
-        copy.fairness = fairness;
-        copy.testOnCreate = testOnCreate;
-        copy.testOnBorrow = testOnBorrow;
-        copy.testOnReturn = testOnReturn;
-        copy.testWhileIdle = testWhileIdle;
-        copy.timeBetweenEvictionRunsMillis = timeBetweenEvictionRunsMillis;
-        copy.minEvictableIdleTimeMillis = minEvictableIdleTimeMillis;
-        copy.softMinEvictableIdleTimeMillis = softMinEvictableIdleTimeMillis;
-        copy.numTestsPerEvictionRun = numTestsPerEvictionRun;
-        copy.jmxEnabled = jmxEnabled;
-        copy.jmxNamePrefix = jmxNamePrefix;
-        copy.jmxNameBase = jmxNameBase;
-        copy.valueCodec = valueCodec;
-        return copy;
     }
 
     /**
@@ -478,14 +419,20 @@ public class RedisConfig {
      * 转换为 Jedis 连接池配置。
      */
     private ConnectionPoolConfig createPoolConfig() {
-        int effectiveMaxIdle = effectiveMaxIdle();
-        int effectiveMinIdle = effectiveMinIdle(effectiveMaxIdle);
-        validatePoolBounds(maxTotal, effectiveMaxIdle, effectiveMinIdle);
+        validatePoolBounds();
         ConnectionPoolConfig poolConfig = new ConnectionPoolConfig();
-        poolConfig.setMaxTotal(maxTotal);
-        poolConfig.setMaxIdle(effectiveMaxIdle);
-        poolConfig.setMinIdle(effectiveMinIdle);
-        poolConfig.setMaxWait(Duration.ofMillis(maxWaitMillis));
+        if (maxTotal != null) {
+            poolConfig.setMaxTotal(maxTotal);
+        }
+        if (maxIdle != null) {
+            poolConfig.setMaxIdle(maxIdle);
+        }
+        if (minIdle != null) {
+            poolConfig.setMinIdle(minIdle);
+        }
+        if (maxWaitMillis != null) {
+            poolConfig.setMaxWait(Duration.ofMillis(maxWaitMillis));
+        }
         if (blockWhenExhausted != null) {
             poolConfig.setBlockWhenExhausted(blockWhenExhausted);
         }
@@ -639,33 +586,16 @@ public class RedisConfig {
     /**
      * 校验连接池上下限关系。
      */
-    private static void validatePoolBounds(int maxTotal, int maxIdle, int minIdle) {
-        if (maxTotal != -1 && maxIdle > maxTotal) {
+    private void validatePoolBounds() {
+        if (maxTotal != null && maxIdle != null && maxTotal != -1 && maxIdle > maxTotal) {
             throw new IllegalArgumentException("maxIdle must be less than or equal to maxTotal");
         }
-        if (minIdle > maxIdle) {
+        if (maxTotal != null && minIdle != null && maxTotal != -1 && minIdle > maxTotal) {
+            throw new IllegalArgumentException("minIdle must be less than or equal to maxTotal");
+        }
+        if (maxIdle != null && minIdle != null && minIdle > maxIdle) {
             throw new IllegalArgumentException("minIdle must be less than or equal to maxIdle");
         }
-    }
-
-    /**
-     * 计算有效最大空闲连接数，避免未显式配置的默认值阻止用户降低 maxTotal。
-     */
-    private int effectiveMaxIdle() {
-        if (!maxIdleConfigured && maxTotal != -1 && maxIdle > maxTotal) {
-            return maxTotal;
-        }
-        return maxIdle;
-    }
-
-    /**
-     * 计算有效最小空闲连接数，避免未显式配置的默认值阻止用户降低 maxIdle。
-     */
-    private int effectiveMinIdle(int effectiveMaxIdle) {
-        if (!minIdleConfigured && minIdle > effectiveMaxIdle) {
-            return effectiveMaxIdle;
-        }
-        return minIdle;
     }
 
     /**

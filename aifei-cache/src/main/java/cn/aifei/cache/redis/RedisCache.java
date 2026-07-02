@@ -56,9 +56,9 @@ public class RedisCache implements Cache, AutoCloseable, CounterFactory {
      * 使用指定配置连接 Redis。
      */
     public RedisCache(RedisConfig config) {
-        RedisConfig configSnapshot = Objects.requireNonNull(config, "config can not be null").copy();
-        this.codec = configSnapshot.createValueCodec();
-        this.client = configSnapshot.createClient();
+        RedisConfig redisConfig = Objects.requireNonNull(config, "config can not be null");
+        this.codec = redisConfig.createValueCodec();
+        this.client = redisConfig.createClient();
     }
 
     /**
@@ -128,7 +128,7 @@ public class RedisCache implements Cache, AutoCloseable, CounterFactory {
     }
 
     /**
-     * 重设 Redis 中已有缓存项的剩余有效期。
+     * 重设 Redis 中已有缓存项的有效期。
      */
     @Override
     public boolean expire(String cacheName, String key, Duration ttl) {

@@ -130,7 +130,7 @@ public class CaffeineCache implements Cache, CounterFactory {
     }
 
     /**
-     * 重设 Caffeine 中已有缓存项的剩余有效期。
+     * 重设 Caffeine 中已有缓存项的有效期。
      */
     @Override
     public boolean expire(String cacheName, String key, Duration ttl) {

@@ -31,7 +31,7 @@ public final class CacheValidator {
      * 判断计数名称与计数键是否有效。
      */
     public static boolean isValidCounterNameAndKey(String counterName, String key) {
-        return isValidCacheNameAndKey(counterName, key);
+        return !StrUtil.isBlank(counterName) && !StrUtil.isBlank(key);
     }
 
     /**

@@ -21,6 +21,7 @@ import java.util.Objects;
 public class RedisCounter implements Counter {
 
     private static final String COUNTER_PREFIX = "_Aifei_Counter_:";
+
     /*
      * Redis Lua 会把嵌套命令的 integer reply 转为 Lua number，大整数直接返回可能丢精度。
      * 因此脚本执行 INCRBY 后读取 Redis 原始字符串作为返回值。
@@ -116,8 +117,7 @@ public class RedisCounter implements Counter {
     /**
      * 使用 Redis 原生 integer 原子更新或创建计数值。
      */
-    private long updateCounter(String counterName, String key, long step, Duration ttl,
-                               boolean increase, boolean refreshTtl) {
+    private long updateCounter(String counterName, String key, long step, Duration ttl, boolean increase, boolean refreshTtl) {
         String validCounterName = CacheValidator.requireCounterName(counterName);
         String validKey = CacheValidator.requireKey(key);
         long validStep = CacheValidator.requireCounterStep(step);
@@ -148,7 +148,7 @@ public class RedisCounter implements Counter {
      */
     private static long toLong(Object result) {
         if (result instanceof Long) {
-            return ((Long) result).longValue();
+            return (Long) result;
         }
         return Long.parseLong(String.valueOf(result));
     }

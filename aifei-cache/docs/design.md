@@ -196,12 +196,11 @@ public interface Counter {
 - `RedisConfig` 支持配置 URI、host、port、user、password、database、clientName、RESP3、SSL、JDK SSL 组件、连接超时、socket 超时、阻塞命令 socket 超时、maxTotal、maxIdle、minIdle、maxWaitMillis、连接池耗尽策略、连接池校验、空闲连接扫描、JMX 基础参数和 `RedisValueCodec`。
 - `CachePlugin` 基于 `RedisCache` 自动创建 `RedisCounter`，并复用相同的 Redis 客户端和连接池，避免缓存与计数各自创建连接池；`RedisValueCodec` 仍只影响普通缓存 value。
 - `RedisConfig` 默认 host 使用 Jedis 的 `Protocol.DEFAULT_HOST`，当前为 `127.0.0.1`。不默认使用 `localhost`，避免受本机 hosts、DNS 或 IPv6 优先级影响。
-- `RedisConfig` 默认值面向普通中小型 Web 应用：连接与 socket 超时默认 2000 毫秒，阻塞命令 socket 超时默认 0，连接池默认 `maxTotal=32`、`maxIdle=16`、`minIdle=1`、`maxWaitMillis=3000`。
-- `RedisConfig` 默认在连接池耗尽时最多等待 3000 毫秒后失败，不无限等待；默认使用 LIFO、非公平等待队列，优先吞吐和低调度开销。
-- 当用户只降低 `maxTotal` 或 `maxIdle` 时，未显式配置的默认 `maxIdle` 或 `minIdle` 会自动收缩到有效上限内；用户显式配置出互相冲突的连接池上下限时仍抛出 `IllegalArgumentException`。
-- `RedisConfig` 默认不在创建、借出或归还连接时执行校验，避免每次缓存操作增加额外 Redis 往返；默认启用空闲连接校验，扫描间隔 60000 毫秒，每轮检查 8 条空闲连接，硬空闲淘汰时间 600000 毫秒，超过 `minIdle` 的软空闲淘汰时间 120000 毫秒。`numTestsPerEvictionRun` 必须大于零。
-- `RedisConfig` 默认启用连接池 JMX，默认 JMX 名称前缀为 `Aifei-Cache-Redis`。
-- `RedisConfig.maxTotal(-1)` 表示连接池最大连接数不限制。`maxWaitMillis`、`timeBetweenEvictionRunsMillis`、`minEvictableIdleTimeMillis` 和 `softMinEvictableIdleTimeMillis` 的 `-1` 语义与 commons-pool 保持一致。
+- `RedisConfig` 未显式配置客户端超时、连接池容量、连接校验、空闲连接扫描和 JMX 参数时，不主动覆盖 Jedis 默认值；具体默认值由当前 Jedis 与 commons-pool 版本决定。
+- `RedisConfig` 默认将 `maxWaitMillis` 设置为 1500 毫秒，故意不同于 commons-pool 的无限等待默认值，用于在连接池耗尽时限制业务线程排队时间；需要无限等待时可显式配置 `maxWaitMillis(-1)`。
+- `RedisConfig` 只将用户显式设置的连接池参数以及默认的 `maxWaitMillis` 写入 Jedis `ConnectionPoolConfig`；用户显式设置的 `maxTotal`、`maxIdle` 或 `minIdle` 之间互相冲突时抛出 `IllegalArgumentException`。
+- `RedisConfig` 的默认连接池容量是保守库默认，不作为生产容量建议；高并发、大 value、大集合缓存、慢网络、代理层或单请求多次访问 Redis 的应用，应按单实例 Redis 调用量、value 传输耗时、应用实例数和 Redis 服务端 `maxclients` 显式配置 `maxTotal`、`maxIdle` 和 `minIdle`。
+- `RedisConfig.maxTotal(-1)` 表示连接池最大连接数不限制。`maxWaitMillis`、`timeBetweenEvictionRunsMillis`、`minEvictableIdleTimeMillis` 和 `softMinEvictableIdleTimeMillis` 的 `-1` 语义与 commons-pool 保持一致。`numTestsPerEvictionRun` 必须为 -1 或大于零。
 - 当同时配置 URI 和其他客户端参数时，URI 提供基础连接信息，显式设置的 user、password、database、clientName、SSL 和超时参数覆盖 URI 中对应的客户端配置。
 - `RedisCache` 的无参、host/port 与 URI 便捷构造器均复用 `RedisConfig` 默认装配，避免便捷构造器与配置对象构造器出现不同默认行为。`RedisCounter` 不提供独立连接构造器，只由 `RedisCache` 在插件装配链路中创建。
 - 物理 key 格式为 `{cacheName}:{key}`。`clear` 扫描时会转义 Redis glob 特殊字符；清理父级名称时也会清理其下级名称。调用方应避免使用会在 Redis 物理 key 上产生相同拼接结果的 `cacheName` 和 `key` 组合。

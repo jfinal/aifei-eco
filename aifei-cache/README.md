@@ -334,17 +334,11 @@ RedisConfig config = new RedisConfig()
 
 默认 host 与 Jedis 保持一致，为 `127.0.0.1`。没有默认使用 `localhost`，这样可以避免本机 hosts、DNS 或 IPv6 优先级差异影响连接行为。
 
-`RedisConfig` 的默认值按普通中小型 Web 应用设计：
+未显式配置客户端超时、连接池容量、连接校验、空闲连接扫描和 JMX 参数时，`RedisConfig`
+不主动覆盖 Jedis 默认值；具体默认值由当前 Jedis 与 commons-pool 版本决定。
+`maxWaitMillis` 是例外，默认值为 1500 毫秒，用于限制连接池耗尽时业务线程的排队时间；需要 commons-pool 的无限等待语义时，可以显式配置 `maxWaitMillis(-1)`。
 
-- 连接和 socket 超时默认 2000 毫秒；阻塞命令 socket 超时默认 0。
-- 连接池默认 `maxTotal=32`、`maxIdle=16`、`minIdle=1`、`maxWaitMillis=3000`。
-- 连接池耗尽时默认最多等待 3000 毫秒，不无限等待。
-- 只降低 `maxTotal` 或 `maxIdle` 时，未显式配置的默认空闲连接上下限会自动收缩到有效范围内。
-- 默认不在创建、借出或归还连接时校验，避免每次缓存操作额外发送校验命令。
-- 默认启用空闲连接校验：每 60000 毫秒扫描一次，每轮检查 8 条空闲连接；空闲 600000 毫秒后可硬淘汰，超过 `minIdle` 的连接空闲 120000 毫秒后可软淘汰。
-- 默认启用连接池 JMX，JMX 名称前缀为 `Aifei-Cache-Redis`。
-
-高并发、慢网络、代理层超时或连接数受限的部署，可以按实际容量覆盖这些值：
+默认连接池容量是保守库默认，不适合作为所有生产环境的容量建议。高并发、大 value、大集合缓存（例如较大的 `List<Model>`）、慢网络、代理层超时、单请求多次访问 Redis 或连接数受限的部署，应按单实例 Redis 调用量、value 传输耗时、应用实例数和 Redis 服务端 `maxclients` 显式配置连接池：
 
 ```java
 RedisConfig config = new RedisConfig()
@@ -352,7 +346,7 @@ RedisConfig config = new RedisConfig()
         .maxTotal(128)
         .maxIdle(32)
         .minIdle(4)
-        .maxWaitMillis(1000)
+        .maxWaitMillis(500)
         .timeoutMillis(1000)
         .testOnBorrow(true);
 ```
@@ -370,7 +364,7 @@ RedisConfig config = new RedisConfig()
 自定义 `RedisValueCodec` 必须是线程安全的，并且共享同一 Redis 的所有应用实例必须使用互相兼容的
 codec 和数据格式。切换 codec 前，需要自行处理 Redis 中已有缓存数据的兼容性、清理或迁移。
 
-`CachePlugin(Cache)` 会根据 `CaffeineCache` 或 `RedisCache` 自动创建对应 `Counter`，并将 `Cache` 和 `Counter` 注册为单例。自动创建的 `RedisCounter` 与 `RedisCache` 共享同一个 Redis 客户端和连接池，因此默认连接池上限仍按一组 `maxTotal=32` 计算。Redis 客户端生命周期由 `RedisCache` 管理，应用不需要单独创建或关闭 `RedisCounter`。配置完成后业务代码只需注入接口：
+`CachePlugin(Cache)` 会根据 `CaffeineCache` 或 `RedisCache` 自动创建对应 `Counter`，并将 `Cache` 和 `Counter` 注册为单例。自动创建的 `RedisCounter` 与 `RedisCache` 共享同一个 Redis 客户端和连接池，不会额外创建第二组 Redis 连接。Redis 客户端生命周期由 `RedisCache` 管理，应用不需要单独创建或关闭 `RedisCounter`。配置完成后业务代码只需注入接口：
 
 ```java
 @Inject
