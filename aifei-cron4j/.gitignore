@@ -1,0 +1,57 @@
+# idea #
+.idea
+*.iml
+
+# vscode #
+.vscode/
+
+# maven #
+target
+
+logs
+.logs
+
+# eclipse #
+.settings
+.project
+.classpath
+.log
+
+# windows #
+Thumbs.db
+
+# Mac #
+.DS_Store
+
+# Package Files #
+*.war
+*.ear
+
+plan.txt
+
+*.class
+
+# Package Files #
+*.jar
+
+
+*.bak
+*.tmp
+*.log
+/bin/
+build.sh
+integration-repo
+/build/
+
+# IDEA metadata and output dirs
+*.ipr
+*.iws
+
+# agent
+.codex/
+.claude/
+
+/webapp/WEB-INF/classes/
+/webapp/WEB-INF/test-classes/
+/webapp/WEB-INF/target/
+
