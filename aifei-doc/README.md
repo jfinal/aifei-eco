@@ -254,7 +254,19 @@ Aifei 没有 Model 概念，对于 Model 的支持完全由生成器实现。使
 
 ## 插入数据
 
-通过 Row 与 Model 对象插入
+通过 Model 插入
+
+``` 
+    // Model 已绑定表名、主键名，只需关心字段
+    new User().name("Aifei").insert();
+    
+    // Model 已绑定表名、复合主键名，只需关心字段
+    new UserRole().userId(123).roleId(456).insert();
+```
+
+实际项目中尽可能使用 Model 插入，避免用字符串方式书写字段名，便于修改 table 字段名后重构代码。
+
+通过 Row 插入
 
 ```
     // of 方法指定表名，主键名默认为相关 Dialect 中的 defaultPrimaryKey 值
@@ -265,18 +277,6 @@ Aifei 没有 Model 概念，对于 Model 的支持完全由生成器实现。使
     
     // of 方法同时指定表名、复合主键名，compositeId 为两个复合主键值赋值
     Row.of("user_role", "user_id", "role_id").compositeId(123, 456).insert();
-    
-    // Model 已绑定表名、主键名，只需关心字段
-    new User().name("Aifei").insert();
-    
-    // Model 已绑定表名、复合主键名，只需关心字段
-    new UserRole().userId(123).roleId(456).insert();
-```
-
-通过 Row 插入
-
-```
-    Row.of("user").set("name", "Aifei").set("age", 18).insert();
 ```
 
 ## 删除数据
@@ -291,7 +291,7 @@ Aifei 没有 Model 概念，对于 Model 的支持完全由生成器实现。使
     Row.of("user_role", "user_id", "role_id").compositeId(123, 456).delete();
     
     // id 方法赋予单主键值
-    new User().id(123).delete();
+    User.of(123).delete();
     
     // userId、roleId 方法赋予复合主键值
     new UserRole().userId(123).roleId(456).delete();
@@ -338,13 +338,13 @@ Aifei 没有 Model 概念，对于 Model 的支持完全由生成器实现。使
 
 ## 更新数据
 
-通过 Row 与 Model 对象更新
+通过 Model 更新
 
-```
-    Row.of("user").id(123).set("name", "James").update();
-    
+``` 
     User.of(123).name("James").update();
 ```
+
+实际项目中尽可能使用 Model 更新，避免用字符串方式书写字段名，便于修改 table 字段名后重构代码。
 
 通过 Row 更新
 
