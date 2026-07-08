@@ -279,6 +279,22 @@ Aifei 没有 Model 概念，对于 Model 的支持完全由生成器实现。使
     Row.of("user_role", "user_id", "role_id").compositeId(123, 456).insert();
 ```
 
+## 更新数据
+
+通过 Model 更新
+
+``` 
+    User.of(123).name("James").update();
+```
+
+实际项目中尽可能使用 Model 更新，避免用字符串方式书写字段名，便于修改 table 字段名后重构代码。
+
+通过 Row 更新
+
+```
+    Row.of("user").id(123).set("name", "James").update();
+```
+
 ## 删除数据
 
 通过 Row 与 Model 对象删除
@@ -334,22 +350,6 @@ Aifei 没有 Model 概念，对于 Model 的支持完全由生成器实现。使
 
      // Model 已绑定表名，无需传入表名
     User.deleteBy("age < ? and age > ?", 18, 25);
-```
-
-## 更新数据
-
-通过 Model 更新
-
-``` 
-    User.of(123).name("James").update();
-```
-
-实际项目中尽可能使用 Model 更新，避免用字符串方式书写字段名，便于修改 table 字段名后重构代码。
-
-通过 Row 更新
-
-```
-    Row.of("user").id(123).set("name", "James").update();
 ```
 
 ## 查询
