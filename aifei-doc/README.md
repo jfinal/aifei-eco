@@ -181,7 +181,7 @@ Aifei 开创 Just Service 范式，在配置完成之后，可以直接开始写
 @Path("/vip")
 public class VipService {
     public Vip findById(int id) {
-        return Task.findById(id);
+        return Vip.findById(id);
     }
 }
 ```
