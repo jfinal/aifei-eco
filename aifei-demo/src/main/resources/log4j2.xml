@@ -13,10 +13,10 @@
     <Appenders>
         <Console name="console">
             <!-- 包名全量输出 -->
-            <PatternLayout pattern="%highlight{%-5level: %date{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %class}: %msg%throwable%n" charset="UTF-8"/>
+            <PatternLayout pattern="%highlight{%-5level: %date{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %class}: %msg%n%throwable%n" charset="UTF-8"/>
 
             <!-- 包名缩略格式输出，减少输出量 -->
-            <!-- <PatternLayout pattern="%highlight{%-5level: %date{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %class{1.}}: %msg%throwable%n" charset="UTF-8"/> -->
+            <!-- <PatternLayout pattern="%highlight{%-5level: %date{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %class{1.}}: %msg%n%throwable%n" charset="UTF-8"/> -->
         </Console>
 
         <!-- 配置文档： https://logging.apache.org/log4j/2.x/manual/appenders/rolling-file.html
@@ -30,7 +30,7 @@
             <!-- 配置 ThresholdFilter 覆盖 WARN、ERROR、FATAL，屏蔽 INFO、DEBUG、TRACE -->
             <ThresholdFilter level="WARN" onMatch="ACCEPT" onMismatch="DENY"/>
 
-            <PatternLayout pattern="[%-5level] %date{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %class: %msg%throwable%n" charset="UTF-8"/>
+            <PatternLayout pattern="[%-5level] %date{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %class: %msg%n%throwable%n" charset="UTF-8"/>
 
             <Policies>
                 <!-- interval 滚动间隔数（单位由 filePattern 中 %d 配置的最小时间单位决定），默认为 1
@@ -60,7 +60,7 @@
 
             <LevelMatchFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
 
-            <PatternLayout pattern="[%-5level] %date{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %class: %msg%throwable%n" charset="UTF-8"/>
+            <PatternLayout pattern="[%-5level] %date{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %class: %msg%n%throwable%n" charset="UTF-8"/>
 
             <Policies>
                 <TimeBasedTriggeringPolicy interval="1" maxRandomDelay="30"/>
