@@ -225,11 +225,13 @@ public class Cron4jPlugin implements Plugin {
 	}
 
 	public synchronized void stop() {
-		for (TaskInfo taskInfo : taskInfoList) {
-			taskInfo.stop();
-		}
+		if (started) {
+			for (TaskInfo taskInfo : taskInfoList) {
+				taskInfo.stop();
+			}
 
-		started = false;
+			started = false;
+		}
 	}
 
 	private static class TaskInfo {
