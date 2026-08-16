@@ -18,7 +18,7 @@ public class CachePlugin implements Plugin {
 
     private final Cache cache;
     private final Counter counter;
-    private volatile boolean started;
+    private volatile boolean started = false;
 
     /**
      * 创建缓存插件，并根据缓存实现创建对应的计数器。
