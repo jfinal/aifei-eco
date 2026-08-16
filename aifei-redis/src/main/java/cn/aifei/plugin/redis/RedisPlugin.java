@@ -99,7 +99,7 @@ public class RedisPlugin implements Plugin {
         this(cacheName, host, Protocol.DEFAULT_PORT, Protocol.DEFAULT_TIMEOUT, password);
     }
 
-    public void start() {
+    public synchronized void start() {
         if (started) {
             return;
         }
@@ -132,14 +132,16 @@ public class RedisPlugin implements Plugin {
         started = true;
     }
 
-    public void stop() {
-        Cache cache = Redis.removeCache(cacheName);
-        if (cache == Redis.mainCache) {
-            Redis.mainCache = null;
-        }
-        cache.jedisPool.destroy();
+    public synchronized void stop() {
+        if (started) {
+            Cache cache = Redis.removeCache(cacheName);
+            if (cache == Redis.mainCache) {
+                Redis.mainCache = null;
+            }
+            cache.jedisPool.destroy();
 
-        started = false;
+            started = false;
+        }
     }
 
     /**
