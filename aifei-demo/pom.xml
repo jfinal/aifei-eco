@@ -24,14 +24,14 @@
     <dependency>
       <groupId>cn.aifei</groupId>
       <artifactId>aifei-all</artifactId>
-      <version>1.0.3</version>
+      <version>1.1.0</version>
     </dependency>
 
     <!-- undertow core -->
     <dependency>
       <groupId>io.undertow</groupId>
       <artifactId>undertow-core</artifactId>
-      <version>2.2.39.Final</version>
+      <version>2.2.40.Final</version>
     </dependency>
 
     <!-- 数据库访问 jdbc、druid -->
@@ -50,7 +50,7 @@
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-core</artifactId>
-      <version>2.26.0</version>
+      <version>2.26.1</version>
     </dependency>
 
   </dependencies>

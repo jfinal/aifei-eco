@@ -47,7 +47,7 @@
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
 
-        <aifei.version>1.0.3</aifei.version>
+        <aifei.version>1.1.0</aifei.version>
         <jedis.version>7.5.2</jedis.version>
         <fury-core.version>0.10.3</fury-core.version>
         <fst.version>2.57</fst.version>     <!-- 注意：高于 2.57 版本不支持 jdk 8 -->
