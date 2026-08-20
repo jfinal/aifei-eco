@@ -6,6 +6,9 @@ undertow.host = 0.0.0.0
 # 配置 HTTP 请求 body 最大值。上传文件大小超过默认值 2M 时需修改该配置。以下配置为 10M
 # undertow.maxBodySize = 10485760
 
+# 配置 HTTP 请求 header 最大值。默认 16KB
+# undertow.maxHeaderSize = 16384
+
 # 配置 css、js、图片等等 web 资源路径
 # "src/main/webapp" 表示从普通路径中加载资源， "classpath:static" 表示从 classpath 与 jar 包中的 static 路径下加载资源
 # undertow.resourcePath = src/main/webapp, classpath:static
