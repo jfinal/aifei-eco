@@ -6,7 +6,6 @@
 
 package cn.aifei.demo.common.arch;
 
-import cn.aifei.argument.NoMatch;
 import cn.aifei.core.Input;
 import cn.aifei.util.StrUtil;
 import com.alibaba.fastjson2.JSONArray;
@@ -24,7 +23,7 @@ import java.util.Map;
 /**
  * In
  */
-public class In implements Input, NoMatch {
+public class In implements Input {
 
     static final InParser IN_PARSER = new InParser();
     static final String[] EMPTY_PATH_PARA = new String[0];

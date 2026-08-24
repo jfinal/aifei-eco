@@ -6,7 +6,6 @@
 
 package cn.aifei.demo.common.arch;
 
-import cn.aifei.argument.NoMatch;
 import cn.aifei.core.Output;
 import cn.aifei.db.transaction.RollbackDecision;
 import java.text.MessageFormat;
@@ -17,7 +16,7 @@ import java.util.Objects;
 /**
  * Out
  */
-public class Out implements Output, NoMatch, RollbackDecision {
+public class Out implements Output, RollbackDecision {
 
     int code;
     String msg;
