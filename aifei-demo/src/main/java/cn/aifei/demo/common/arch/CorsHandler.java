@@ -124,7 +124,7 @@ public class CorsHandler extends Handler<In, Out> {
     }
 
     @Override
-    public void handle(String path, In in, Out out) throws Throwable {
+    public void handle(String path, In in, Out out) throws Exception {
         HttpServerExchange exchange = in.getExchange();
         HeaderMap responseHeaders = exchange.getResponseHeaders();
 

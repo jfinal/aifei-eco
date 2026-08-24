@@ -60,7 +60,7 @@ public class IoHandler extends Handler<In, Out> {
      * 4: 处理统一后的 Out 对象：handleOutput(out)
      */
     @Override
-    public void handle(String path, In in, Out out) throws Throwable {
+    public void handle(String path, In in, Out out) throws Exception {
         // 匹配路径获取 action
         Action action = router.getAction(path, in);
         if (action == null) {
