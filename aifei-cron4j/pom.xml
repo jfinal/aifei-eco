@@ -59,6 +59,7 @@
             <groupId>cn.aifei</groupId>
             <artifactId>aifei</artifactId>
             <version>${aifei.version}</version>
+            <optional>true</optional>
         </dependency>
 
         <!-- cron4j 任务调度 -->
