@@ -151,6 +151,9 @@ public class RedisCache implements Cache, AutoCloseable, CounterFactory {
 
     /**
      * 扫描并清空指定名称下的缓存项。
+     *
+     * <p>按 {@code cacheName + ":"} 物理前缀清理，无法区分名称与业务 key 中的冒号。
+     * 调用方须避免业务 key 前缀与清理目标重叠，详见 {@link Cache} 的命名责任。</p>
      */
     @Override
     public void clear(String cacheName) {
@@ -184,7 +187,8 @@ public class RedisCache implements Cache, AutoCloseable, CounterFactory {
      * 生成清理缓存时使用的 Redis glob 匹配模式。
      *
      * <p>模式只基于 cacheName 生成；key 即使包含冒号，也由末尾的 {@code *} 匹配。
-     * 冒号不是 Redis glob 特殊字符，不需要转义。</p>
+     * 冒号不是 Redis glob 特殊字符，不需要转义。
+     * glob 转义不解决名称与业务 key 的边界歧义，前缀冲突由调用方负责避免。</p>
      */
     private byte[] redisPattern(String cacheName) {
         return bytes(escapeRedisGlob(cacheName) + ":*");

@@ -12,7 +12,7 @@ import java.time.Duration;
  * 本地计数和分布式计数共用接口。
  *
  * <p>计数名称和键区分大小写且不能为空白，均可用冒号分级。
- * TTL 精度为毫秒，因此有效期不能小于一毫秒。</p>
+ * TTL 精度为毫秒，有效期不能小于一毫秒或大于 {@link Integer#MAX_VALUE} 秒（约 68 年）。</p>
  *
  * <p>普通读取的计数名称或键非法时返回 {@code null}，删除的计数名称或键非法时不执行任何操作。
  * 其他调用参数校验失败时抛出 {@link IllegalArgumentException}。

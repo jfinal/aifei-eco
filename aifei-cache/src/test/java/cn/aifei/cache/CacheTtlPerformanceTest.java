@@ -1,13 +1,16 @@
 package cn.aifei.cache;
 
 import cn.aifei.cache.caffeine.CaffeineCache;
+import cn.aifei.cache.internal.CacheValidator;
 import org.junit.Assume;
 import org.junit.Test;
 
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.Random;
 import java.util.function.Supplier;
+import static org.junit.Assert.assertEquals;
 
 /**
  * 手动运行的 TTL 参数性能对比。
@@ -28,6 +31,8 @@ public class CacheTtlPerformanceTest {
             300, 600, 900, 1800, 3600, 7200, 21600, 86400
     };
     private static final Duration[] TTL_DURATIONS = createDurations();
+    private static final Duration MIN_TTL = Duration.ofMillis(1);
+    private static final Duration MAX_TTL = Duration.ofSeconds(Integer.MAX_VALUE);
     private static final String CACHE_NAME = "bench";
     private static final String KEY = "key";
     private static final Object VALUE = "value";
@@ -40,6 +45,74 @@ public class CacheTtlPerformanceTest {
 
     private static volatile long longSink;
     private static volatile Object objectSink;
+
+    /**
+     * 在相同的合法输入上比较原毫秒校验、Duration 范围比较与当前数值校验。
+     */
+    @Test
+    public void shouldCompareTtlValidationCost() {
+        Assume.assumeTrue("manual performance test is disabled",
+                Boolean.getBoolean("aifei.cache.performanceTest"));
+        int iterations = Integer.getInteger("aifei.cache.performance.conversionIterations", 10_000_000);
+        int warmupRounds = Integer.getInteger("aifei.cache.performance.warmupRounds", 5);
+        int measureRounds = Integer.getInteger("aifei.cache.performance.measureRounds", 7);
+        final Duration[] values = Arrays.copyOf(TTL_DURATIONS, 32);
+        for (int i = 16; i < values.length; i++) values[i] = Duration.ofSeconds(i, i * 12_345_678);
+        values[0] = MIN_TTL;
+        values[1] = Duration.ofNanos(1_999_999);
+        values[30] = MAX_TTL.minusNanos(1);
+        values[31] = MAX_TTL;
+
+        // 用 JDK 的转换结果核对边界和随机小数秒，避免快了却改变毫秒精度。
+        for (Duration ttl : values) assertEquals(ttl.toMillis(), CacheValidator.requireTtl(ttl));
+        Random random = new Random(20260910);
+        for (int i = 0; i < 10_000; i++) {
+            Duration ttl = Duration.ofSeconds(1L + random.nextInt(Integer.MAX_VALUE - 1), random.nextInt(1_000_000_000));
+            assertEquals(ttl.toMillis(), CacheValidator.requireTtl(ttl));
+        }
+
+        Result original = benchmark("original positive millis check", iterations, warmupRounds, measureRounds, new Task() {
+            @Override public long run(int count) {
+                long total = 0;
+                for (int i = 0; i < count; i++) total += originalTtlValidation(values[i & 31]);
+                return total;
+            }
+        });
+        Result comparison = benchmark("Duration.compareTo bounds", iterations, warmupRounds, measureRounds, new Task() {
+            @Override public long run(int count) {
+                long total = 0;
+                for (int i = 0; i < count; i++) total += durationTtlValidation(values[i & 31]);
+                return total;
+            }
+        });
+        Result current = benchmark("primitive bounds (current)", iterations, warmupRounds, measureRounds, new Task() {
+            @Override public long run(int count) {
+                long total = 0;
+                for (int i = 0; i < count; i++) total += CacheValidator.requireTtl(values[i & 31]);
+                return total;
+            }
+        });
+        System.out.println("TTL validation only: " + iterations + " iterations, " + warmupRounds
+                + " warmup rounds, " + measureRounds + " measurement rounds");
+        System.out.println(String.format(Locale.ROOT, "%-42s %12s %12s %12s",
+                "case", "best ns/op", "median ns/op", "vs original"));
+        printResult(original, original);
+        printResult(comparison, original);
+        printResult(current, original);
+    }
+
+    private static long originalTtlValidation(Duration ttl) {
+        if (ttl == null) throw new IllegalArgumentException();
+        long millis = ttl.toMillis();
+        if (millis <= 0) throw new IllegalArgumentException();
+        return millis;
+    }
+
+    private static long durationTtlValidation(Duration ttl) {
+        if (ttl == null) throw new IllegalArgumentException();
+        if (ttl.compareTo(MIN_TTL) < 0 || ttl.compareTo(MAX_TTL) > 0) throw new IllegalArgumentException();
+        return ttl.toMillis();
+    }
 
     /**
      * 对比 {@link Duration} TTL 与 int 秒级 TTL 的转换成本和 Caffeine 热路径调用成本。

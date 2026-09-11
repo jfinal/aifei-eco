@@ -37,6 +37,8 @@ aifei-cache 是为 [aifei](https://aifei.cn) 提供的极简缓存与计数组�
 
 两种部署方式使用同一组公共接口。业务代码保持不变，只需在应用配置或依赖注入层切换具体实现。
 
+命名空间隔离与实现可替换保证以调用方遵守下文的命名责任为前提。使用 Caffeine 时也应按同一约定规划名称与业务 key。
+
 ## Maven 依赖
 
 ```xml
@@ -185,6 +187,13 @@ if (draft != null) {
 
 `cacheName` 和 `key` 不能为空白，均可使用冒号分级。`clear("user")` 会同时清理 `user:profile` 等下级缓存。所有写入和续期都必须指定大于零的 TTL。缓存未命中、条目过期，或普通 `get` 收到非法 `cacheName`/`key` 时，返回 `null`。`exists` 在缓存项存在且未过期时返回 `true`，缓存项不存在、已过期或收到非法 `cacheName`/`key` 时返回 `false`。`putIfAbsent` 只在缓存项不存在或已过期时写入并返回 `true`；缓存项存在且未过期时不覆盖原值、不重置原 TTL，并返回 `false`。`expire` 只在缓存项存在且未过期时重设剩余有效期并返回 `true`，不读取、不修改缓存值；缓存项不存在或已过期时返回 `false`。`remove` 收到非法 `cacheName`/`key` 时按未命中处理，不删除任何缓存项。除普通 `get`、`exists` 和 `remove` 的非法 `cacheName`/`key` 外，参数校验失败统一抛出 `IllegalArgumentException`。
 
+**命名责任：** 业务 key 允许包含 `:`，Redis 保留 `cacheName + ":" + key` 的原始格式，便于直接查询和按冒号查看目录。库不额外检查命名冲突，调用方负责避免以下组合并承担冲突造成的影响：
+
+- **拼接重名：** `("user", "profile:42")` 和 `("user:profile", "42")` 都对应物理 key `user:profile:42`，在 Redis 中会读写同一条目，续期和删除也会相互影响。
+- **清理前缀重叠：** 写入 `("user", "profile:42")` 后执行 `clear("user:profile")`，Redis 会清理这个父级条目，即使目标子命名空间没有任何条目。仅避免完整物理 key 重名仍不足以避免这种情况。
+
+冲突命名组合不在命名空间隔离与实现可替换保证范围内。Caffeine 能区分名称和业务 key，Redis 无法从拼接结果中区分；在 Caffeine 下正常工作不代表切换 Redis 后也安全。这是已接受的设计限制，使用层级名称与冒号业务 key 时，应一并规划哪些名称允许执行 `clear`。
+
 通过 Loader 可以在缓存未命中时加载、缓存并返回数据：
 
 ```java
@@ -195,6 +204,8 @@ User user = cache.get(
         () -> userService.findById(userId)
 );
 ```
+
+`Cache` 与 `Counter` 的 TTL 范围统一为 1 毫秒至 `Integer.MAX_VALUE` 秒（约 68 年），包含两端。超过上限时抛出 `IllegalArgumentException`，不缩短用户传入的有效期；固定窗口命中等不使用 TTL 的调用也必须提供合法 TTL。
 
 带 Loader 的 `get` 会先校验 `cacheName`、`key` 和 TTL，参数非法时不会调用 Loader。Loader 返回 `null` 时不会写入缓存，其异常会直接向调用方传播。该机制不提供防缓存击穿保证，并发未命中时 Loader 可能被重复执行。
 
@@ -376,6 +387,8 @@ Counter counter;
 
 Redis value 默认使用 Fury 兼容模式序列化。使用默认 codec 时，Redis 必须是应用可信的内部服务，不能允许不可信方写入缓存数据。`RedisCounter` 使用 Redis 原生 integer value，不受 `RedisValueCodec` 影响。
 
+`_Aifei_Counter_:` 是 Redis 计数的内部保留前缀。调用方不得通过普通缓存名称与 key 的拼接或外部命令占用此前缀；库不额外检查这种误用。
+
 ## 测试
 
 普通单元测试不要求本地 Redis：
@@ -391,5 +404,9 @@ mvn -Dredis.integration=true \
     -Dredis.uri=redis://127.0.0.1:6379 \
     test
 ```
+
+发布前使用 `mvn clean verify`，在打包后额外检查实际 JAR、源码、Javadoc、Java 8 字节码与可选依赖隔离。加入 `-Dredis.integration=true` 可同时验证真实 Redis 和 Fury 新旧 POJO 字段兼容性。
+
+独立回归测试的覆盖、运行方式及检查结果见 [测试说明与检查记录](docs/testing.md)。极端 TTL 导致 Redis 计数刷新报错后数值已改变的问题，通过统一 TTL 上限在调用前拒绝超限参数解决，回归随 Redis 集成测试执行。冒号命名造成的拼接重名和子命名空间清理影响属于已接受的设计限制；`KeyNamingLimitationTest` 保留实际行为的复现，Redis 实例随普通 Redis 集成测试执行。
 
 完整的行为契约与实现约束详见 [docs/design.md](docs/design.md)。

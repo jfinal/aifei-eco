@@ -13,7 +13,6 @@ import com.github.benmanes.caffeine.cache.Policy;
 import com.github.benmanes.caffeine.cache.Ticker;
 import java.time.Duration;
 import java.util.Objects;
-import java.util.OptionalLong;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -21,15 +20,11 @@ import java.util.concurrent.TimeUnit;
  */
 public class CaffeineCounter implements Counter {
 
-    // counterLock 使用位掩码取下标，因此 COUNTER_LOCK_COUNT 必须保持 2 的幂。
-    // 如果改为非 2 的幂，应将下标计算改为 (hash & 0x7FFFFFFF) % COUNTER_LOCK_COUNT。
-    private static final int COUNTER_LOCK_COUNT = 128;
-    private static final int COUNTER_LOCK_INDEX_MASK = COUNTER_LOCK_COUNT - 1;
     public static final long DEFAULT_MAXIMUM_SIZE = 10_000L;
 
     private final com.github.benmanes.caffeine.cache.Cache<CaffeineCacheKey, Long> counters;
     private final Policy.VarExpiration<CaffeineCacheKey, Long> expiration;
-    private final Object[] counterLocks = createCounterLocks();
+    private final CaffeineLocks locks = new CaffeineLocks();
 
     /**
      * 使用默认容量创建计数器。
@@ -74,7 +69,10 @@ public class CaffeineCounter implements Counter {
         if (!CacheValidator.isValidCounterNameAndKey(counterName, key)) {
             return null;
         }
-        return counters.getIfPresent(new CaffeineCacheKey(counterName, key));
+        CaffeineCacheKey counterKey = new CaffeineCacheKey(counterName, key);
+        synchronized (locks.forKey(counterKey)) {
+            return counters.getIfPresent(counterKey);
+        }
     }
 
     /**
@@ -117,7 +115,10 @@ public class CaffeineCounter implements Counter {
         if (!CacheValidator.isValidCounterNameAndKey(counterName, key)) {
             return;
         }
-        counters.invalidate(new CaffeineCacheKey(counterName, key));
+        CaffeineCacheKey counterKey = new CaffeineCacheKey(counterName, key);
+        synchronized (locks.forKey(counterKey)) {
+            counters.invalidate(counterKey);
+        }
     }
 
     /**
@@ -130,43 +131,20 @@ public class CaffeineCounter implements Counter {
         long ttlMillis = CacheValidator.requireTtl(ttl);
         CaffeineCacheKey counterKey = new CaffeineCacheKey(validCounterName, validKey);
 
-        synchronized (counterLock(validCounterName, validKey)) {
-            OptionalLong existingTtl = expiration.getExpiresAfter(counterKey, TimeUnit.NANOSECONDS);
-            Long value = existingTtl.isPresent() ? counters.getIfPresent(counterKey) : null;
-            if (value == null) {
-                long initialValue = increase ? validStep : Math.subtractExact(0L, validStep);
-                expiration.put(counterKey, initialValue, ttlMillis, TimeUnit.MILLISECONDS);
-                return initialValue;
-            }
-
+        synchronized (locks.forKey(counterKey)) {
+            Long value = counters.getIfPresent(counterKey);
+            long currentValue = value == null ? 0L : value;
             long newValue = increase
-                    ? Math.addExact(value, validStep)
-                    : Math.subtractExact(value, validStep);
-            if (refreshTtl) {
+                    ? Math.addExact(currentValue, validStep)
+                    : Math.subtractExact(currentValue, validStep);
+            if (value == null || refreshTtl) {
                 expiration.put(counterKey, newValue, ttlMillis, TimeUnit.MILLISECONDS);
-            } else {
-                expiration.put(counterKey, newValue, existingTtl.getAsLong(), TimeUnit.NANOSECONDS);
+            } else if (counters.asMap().replace(counterKey, newValue) == null) {
+                // replace 保留原截止点；替换前已过期或被淘汰时，从 0 重新创建。
+                newValue = increase ? validStep : -validStep;
+                expiration.put(counterKey, newValue, ttlMillis, TimeUnit.MILLISECONDS);
             }
             return newValue;
         }
-    }
-
-    /**
-     * 选择计数 key 对应的分段锁。
-     */
-    private Object counterLock(String counterName, String key) {
-        int hash = 31 * counterName.hashCode() + key.hashCode();
-        return counterLocks[hash & COUNTER_LOCK_INDEX_MASK];
-    }
-
-    /**
-     * 创建计数分段锁。
-     */
-    private static Object[] createCounterLocks() {
-        Object[] locks = new Object[COUNTER_LOCK_COUNT];
-        for (int i = 0; i < locks.length; i++) {
-            locks[i] = new Object();
-        }
-        return locks;
     }
 }

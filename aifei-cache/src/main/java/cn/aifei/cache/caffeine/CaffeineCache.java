@@ -29,6 +29,7 @@ public class CaffeineCache implements Cache, CounterFactory {
 
     private final com.github.benmanes.caffeine.cache.Cache<CaffeineCacheKey, Object> cache;
     private final Policy.VarExpiration<CaffeineCacheKey, Object> expiration;
+    private final CaffeineLocks locks = new CaffeineLocks();
     private final long maximumSize;
     private final Ticker ticker;
 
@@ -86,7 +87,10 @@ public class CaffeineCache implements Cache, CounterFactory {
         if (!CacheValidator.isValidCacheNameAndKey(cacheName, key)) {
             return null;
         }
-        return (T) cache.getIfPresent(new CaffeineCacheKey(cacheName, key));
+        CaffeineCacheKey cacheKey = new CaffeineCacheKey(cacheName, key);
+        synchronized (locks.forKey(cacheKey)) {
+            return (T) cache.getIfPresent(cacheKey);
+        }
     }
 
     /**
@@ -94,10 +98,7 @@ public class CaffeineCache implements Cache, CounterFactory {
      */
     @Override
     public boolean exists(String cacheName, String key) {
-        if (!CacheValidator.isValidCacheNameAndKey(cacheName, key)) {
-            return false;
-        }
-        return cache.getIfPresent(new CaffeineCacheKey(cacheName, key)) != null;
+        return get(cacheName, key) != null;
     }
 
     /**
@@ -109,7 +110,10 @@ public class CaffeineCache implements Cache, CounterFactory {
         CacheValidator.requireKey(key);
         CacheValidator.requireValue(value);
         long ttlMillis = CacheValidator.requireTtl(ttl);
-        expiration.put(new CaffeineCacheKey(cacheName, key), value, ttlMillis, TimeUnit.MILLISECONDS);
+        CaffeineCacheKey cacheKey = new CaffeineCacheKey(cacheName, key);
+        synchronized (locks.forKey(cacheKey)) {
+            expiration.put(cacheKey, value, ttlMillis, TimeUnit.MILLISECONDS);
+        }
     }
 
     /**
@@ -121,12 +125,10 @@ public class CaffeineCache implements Cache, CounterFactory {
         CacheValidator.requireKey(key);
         CacheValidator.requireValue(value);
         long ttlMillis = CacheValidator.requireTtl(ttl);
-        return expiration.putIfAbsent(
-                new CaffeineCacheKey(cacheName, key),
-                value,
-                ttlMillis,
-                TimeUnit.MILLISECONDS
-        );
+        CaffeineCacheKey cacheKey = new CaffeineCacheKey(cacheName, key);
+        synchronized (locks.forKey(cacheKey)) {
+            return expiration.putIfAbsent(cacheKey, value, ttlMillis, TimeUnit.MILLISECONDS);
+        }
     }
 
     /**
@@ -138,13 +140,15 @@ public class CaffeineCache implements Cache, CounterFactory {
         CacheValidator.requireKey(key);
         long ttlMillis = CacheValidator.requireTtl(ttl);
         CaffeineCacheKey cacheKey = new CaffeineCacheKey(cacheName, key);
-        // setExpiresAfter 会更新已过期但尚未清理的节点，先判断剩余时间避免复活过期项。
-        OptionalLong existingTtl = expiration.getExpiresAfter(cacheKey, TimeUnit.NANOSECONDS);
-        if (!existingTtl.isPresent()) {
-            return false;
+        synchronized (locks.forKey(cacheKey)) {
+            // 检查与续期共用锁，其他调用不会在两者之间观察到条目过期。
+            OptionalLong existingTtl = expiration.getExpiresAfter(cacheKey, TimeUnit.NANOSECONDS);
+            if (!existingTtl.isPresent()) {
+                return false;
+            }
+            expiration.setExpiresAfter(cacheKey, ttlMillis, TimeUnit.MILLISECONDS);
+            return true;
         }
-        expiration.setExpiresAfter(cacheKey, ttlMillis, TimeUnit.MILLISECONDS);
-        return true;
     }
 
     /**
@@ -155,7 +159,10 @@ public class CaffeineCache implements Cache, CounterFactory {
         if (!CacheValidator.isValidCacheNameAndKey(cacheName, key)) {
             return;
         }
-        cache.invalidate(new CaffeineCacheKey(cacheName, key));
+        CaffeineCacheKey cacheKey = new CaffeineCacheKey(cacheName, key);
+        synchronized (locks.forKey(cacheKey)) {
+            cache.invalidate(cacheKey);
+        }
     }
 
     /**
@@ -170,6 +177,10 @@ public class CaffeineCache implements Cache, CounterFactory {
                 keys.add(key);
             }
         }
-        cache.invalidateAll(keys);
+        for (CaffeineCacheKey key : keys) {
+            synchronized (locks.forKey(key)) {
+                cache.invalidate(key);
+            }
+        }
     }
 }

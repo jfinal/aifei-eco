@@ -29,6 +29,8 @@ aifei-cache 是为 aifei 提供的极简缓存与计数抽象。它让业务项�
 
 `CaffeineCache` 和 `RedisCache` 必须遵循相同的缓存接口契约，`CaffeineCounter` 和 `RedisCounter` 必须遵循相同的计数接口契约。切换实现只能影响依赖注入或应用配置，不应要求修改业务调用代码。
 
+`Cache` 的命名空间隔离与实现可替换保证以调用方遵守本文的命名责任为前提。产生拼接重名或清理前缀重叠的命名组合不在该保证范围内，库不额外检查这类冲突。
+
 ### 保持极简
 
 `Cache` 只提供业务缓存所需的最小能力，`Counter` 只提供业务计数所需的最小能力。新增方法、配置项或扩展点前，应确认它对两种实现均有清晰且一致的语义。
@@ -120,13 +122,14 @@ public interface Counter {
 
 ### 参数与返回值
 
-- `cacheName` 和 `key` 是区分大小写的非空白字符串，均可用冒号分级。
+- `cacheName` 和 `key` 是区分大小写的非空白字符串，均可用冒号分级；使用冒号时，调用方须遵守下文的命名责任。库不因 `key` 包含冒号而拒绝调用。
 - `counterName` 与 `cacheName` 遵循相同命名规则。
 - `value` 不能为 `null`。
-- `ttl` 不能为 `null`，转换为毫秒后必须大于零。
+- `ttl` 不能为 `null`，范围为 1 毫秒至 `Integer.MAX_VALUE` 秒（约 68 年），包含两端；超过上限时抛出 `IllegalArgumentException`。
 - `ttlSeconds` 必须大于零，秒重载通过 default 方法转为 `Duration`。
 - `Counter` 的 `step` 必须大于零。
 - TTL 统一按毫秒精度处理，不足一毫秒的时长不被接受。
+- TTL 范围在转换为毫秒之前校验，不截断或缩短超限时长；四个实现与带 loader 的 `get` 共用该规则。命中时不使用 TTL 的调用也必须提供合法 TTL。
 - `get` 在缓存未命中或条目过期时返回 `null`。
 - 普通 `get(cacheName, key)` 在 `cacheName` 或 `key` 非法时也返回 `null`，按不可能命中处理。
 - `exists(cacheName, key)` 在缓存项存在且未过期时返回 `true`，缓存项不存在、已过期或 `cacheName`、`key` 非法时返回 `false`。
@@ -152,7 +155,7 @@ public interface Counter {
 
 ### 行为契约
 
-- `cacheName` 是业务缓存命名空间；同一 `key` 在不同命名空间中互不影响。
+- `cacheName` 是业务缓存命名空间；遵守命名责任时，同一 `key` 在不同命名空间中互不影响。
 - 再次写入相同 `cacheName` 和 `key` 时覆盖原 value，并从写入时刻重新计算 TTL。
 - `putIfAbsent` 是单条缓存项的条件写入操作，不承诺分布式锁语义；`CaffeineCache` 只提供单进程内条件写入，`RedisCache` 依赖 Redis 单 key 条件写入。
 - `expire` 是单条缓存项的显式续期操作，不读取、不反序列化、不修改 value；调用方可用于滑动时间窗口，但本接口不提供按访问自动续期。
@@ -161,7 +164,7 @@ public interface Counter {
 - `Counter.increase` 和 `Counter.decrease` 用于固定窗口计数：第一次创建计数项时确定过期时间，后续命中更新不延长窗口。
 - `Counter.increaseAndRefreshTtl` 和 `Counter.decreaseAndRefreshTtl` 用于闲置过期计数：每次命中更新后从当前调用重新计算 TTL，但不等价于精确的最近 N 秒滑动窗口统计。
 - `Counter` 的增减方法是单条计数项的原子更新操作；`CaffeineCounter` 保证单进程内同 key 原子更新，`RedisCounter` 保证 Redis 单 key 原子更新，不承诺跨 key 原子性。
-- `clear(cacheName)` 清理指定命名空间及其下级命名空间。
+- `clear(cacheName)` 清理指定命名空间及其下级命名空间；范围隔离以调用方避免清理前缀重叠为前提。
 - `clear` 是非原子、尽力清理操作；与并发写入同时发生时，不保证并发写入的条目最终保留或删除。
 - 业务代码应将缓存值当作不可变数据使用。Caffeine 保存对象引用，Redis 保存序列化快照，修改原对象后的可见性不属于接口契约。
 - 除普通 `get(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中返回 `null`，`exists(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中返回 `false`，以及 `remove(cacheName, key)` 的非法 `cacheName` 或 `key` 按未命中忽略外，参数校验失败统一抛出 `IllegalArgumentException`；Loader 自身异常原样传播。底层缓存、连接、序列化和标准库运行时异常直接向调用方传播。
@@ -178,6 +181,7 @@ public interface Counter {
 - `exists` 通过本地缓存项是否可读取判断存在性。
 - `putIfAbsent` 使用 Caffeine 逐条过期策略的条件写入能力。
 - `expire` 使用 Caffeine 逐条过期策略重设已有条目的剩余有效期。
+- 同一 key 的读取、存在性判断、写入、条件写入、续期和删除共用 128 把分段锁；续期的存活检查与 TTL 更新在锁内完成，避免其他调用观察到检查与更新之间的过期空档。
 - `clear` 遍历本地 key 并清理指定命名空间及其下级。
 
 ### CaffeineCounter
@@ -186,7 +190,8 @@ public interface Counter {
 - 使用 Caffeine 的逐条过期能力实现每个计数项独立 TTL。
 - 默认最多保存 10000 个计数项，并允许通过构造参数覆盖上限。
 - `increase` 和 `decrease` 使用 128 把 striped locks 按 `counterName` 和 `key` 分散加锁，在锁内读取、计算并写回计数值。
-- 命中更新时保留原剩余 TTL；缺失创建时使用调用传入的 TTL。
+- `get` 和 `remove` 使用相同的分段锁，与增减操作保持同 key 的原子顺序。
+- 固定窗口命中更新使用 Caffeine 原生 `replace` 保留原过期截止点，不把此前读取的剩余 TTL 重新作为写入 TTL；若替换前条目已经过期或被淘汰，则从 0 开始，使用调用传入的 TTL 创建计数项。
 - `increaseAndRefreshTtl` 和 `decreaseAndRefreshTtl` 复用相同的 striped locks，在锁内读取、计算、写回计数值并将剩余 TTL 重置为调用传入的 TTL。
 
 ### RedisCache
@@ -203,7 +208,7 @@ public interface Counter {
 - `RedisConfig.maxTotal(-1)` 表示连接池最大连接数不限制。`maxWaitMillis`、`timeBetweenEvictionRunsMillis`、`minEvictableIdleTimeMillis` 和 `softMinEvictableIdleTimeMillis` 的 `-1` 语义与 commons-pool 保持一致。`numTestsPerEvictionRun` 必须为 -1 或大于零。
 - 当同时配置 URI 和其他客户端参数时，URI 提供基础连接信息，显式设置的 user、password、database、clientName、SSL 和超时参数覆盖 URI 中对应的客户端配置。
 - `RedisCache` 的无参、host/port 与 URI 便捷构造器均复用 `RedisConfig` 默认装配，避免便捷构造器与配置对象构造器出现不同默认行为。`RedisCounter` 不提供独立连接构造器，只由 `RedisCache` 在插件装配链路中创建。
-- 物理 key 格式为 `{cacheName}:{key}`。`clear` 扫描时会转义 Redis glob 特殊字符；清理父级名称时也会清理其下级名称。调用方应避免使用会在 Redis 物理 key 上产生相同拼接结果的 `cacheName` 和 `key` 组合。
+- 物理 key 格式为 `{cacheName}:{key}`，业务 key 保持原样。`clear` 扫描时会转义 Redis glob 特殊字符，并按 `{cacheName}:` 物理前缀清理。该前缀无法区分命名空间中的冒号与业务 key 中的冒号；调用方须避免完整物理 key 重名和清理前缀重叠，详见下文的命名责任。
 - 默认 value codec 使用 Fury `CompatibleMode.COMPATIBLE` 序列化为二进制数据，支持滚动发布期间常见的 POJO 字段增删。
 - 默认 Fury codec 启用引用跟踪，支持缓存快照中的共享引用和循环引用；数字编码使用 Fury 默认压缩策略，不关闭 number compression。
 - 默认 Fury codec 未强制类注册，因此使用默认 codec 时 Redis 必须是可信内部服务，不允许不可信方写入缓存数据。
@@ -224,11 +229,13 @@ public interface Counter {
 
 - 使用独立 Redis key 命名空间和 Redis 原生 integer value，不经过 `RedisValueCodec`。
 - 不直接创建、拥有或关闭 Redis 客户端；Redis 连接生命周期由创建它的 `RedisCache` 管理。
-- 计数物理 key 使用内部前缀，与 `RedisCache` 的普通缓存 key 隔离。调用方应避免使用会在 Redis 计数物理 key 上产生相同拼接结果的 `counterName` 和 `key` 组合。
+- 计数物理 key 使用内部保留前缀 `_Aifei_Counter_:`。调用方不得通过普通 `Cache` 或外部命令向此前缀写入其他数据，包括通过 `cacheName` 与 `key` 拼接占用此前缀；库不额外检查或防御这种误用。调用方也应避免使用会在 Redis 计数物理 key 上产生相同拼接结果的 `counterName` 和 `key` 组合。
 - `increase` 和 `decrease` 使用 Lua 脚本把缺失初始化、TTL 设置和 `INCRBY` 计数更新合成一次 Redis 单 key 原子操作。
 - 命中更新时保留原剩余 TTL；缺失创建时使用调用传入的 TTL。
 - `increaseAndRefreshTtl` 和 `decreaseAndRefreshTtl` 使用同一类 Lua 脚本把缺失初始化、`INCRBY` 计数更新和命中 TTL 刷新合成一次 Redis 单 key 原子操作。
-- `get` 只解析原生 signed long 文本；如果内部计数 key 存在但不是整数，或没有 TTL，抛出 `IllegalStateException`。
+- 所有计数更新先在 Java 中校验 TTL 上限，再执行 Lua；脚本保留 `INCRBY` 后按需 `PEXPIRE` 的原流程，不包含 TTL 失败后的反向恢复分支。固定窗口命中更新不触碰 TTL。
+- `get` 只解析原生 signed long 文本；已读取的 String 不是合法整数，或计数没有 TTL，仍抛出 `IllegalStateException`。
+- `get` 直接调用 Redis `GET`。根据 2026-09-10 的决定，内部前缀误用不属于额外防御范围，`WRONGTYPE` 等 Redis 读取异常原样传播，不再单独包装。
 - `RedisConfig.valueCodec` 只影响 `RedisCache`，不影响 `RedisCounter`。
 
 ## aifei 生命周期
@@ -250,11 +257,32 @@ public interface Counter {
 
 - 优先保证 `Cache` 接口稳定、清晰和实现无关。
 - 优先保证 `Counter` 接口稳定、清晰和实现无关。
-- 两种缓存实现的公共行为必须一致，两种计数实现的公共行为必须一致；无法一致实现的能力不应直接加入公共接口。
+- 在约定的使用前提和支持范围内，两种缓存实现的公共行为必须一致，两种计数实现的公共行为必须一致；无法一致实现的能力不应直接加入公共接口。
 - 不为尚未出现的需求预先增加复杂抽象。
 - 任何会改变公共行为的设计决策都应先更新本文档，再落实到代码和测试。
 - README 只保留面向使用者的说明，详细设计决策统一维护在本文档中。
 - Caffeine、Jedis 和 Fury 保持 Maven optional 依赖，README 必须明确不同实现、默认 Fury codec 和自定义 codec 场景所需的运行时依赖。
+
+## 调用方命名责任（2026-09-10）
+
+为保留原始 key 的可读性、Redis 客户端按冒号展示的目录结构和简单实现，决定继续使用 `{cacheName}:{key}` 物理格式，允许业务 key 包含冒号，不增加转义、编码、命名冲突校验或额外索引。调用方负责规划命名并承担冲突造成的影响：
+
+1. **避免拼接重名。** 不同的 `cacheName`、`key` 组合不得产生相同的完整物理 key。例如 `("user", "profile:42")` 与 `("user:profile", "42")` 都对应 `user:profile:42`；Redis 会把它们视为同一条目，读写、条件写入、续期和删除都会相互影响。
+2. **避免清理前缀重叠。** 业务 key 的前缀不得与可能执行 `clear` 的下级命名空间重叠。例如写入 `("user", "profile:42")` 后执行 `clear("user:profile")`，Redis 的 `user:profile:*` 会清理该父级条目。即使目标子命名空间没有条目，或父子条目的完整物理 key 不同，也会触发。
+
+上述责任是 `Cache` 两种实现共用的使用前提。Caffeine 分别保存名称与业务 key，能够区分上述条目；Redis 使用拼接后的物理 key，不能提供相同的区分能力。冲突命名组合不在命名空间隔离与实现可替换保证范围内。调用方不能以某组命名在 Caffeine 下正常工作为依据，假定它切换 Redis 后也具有相同效果。非空白等参数校验规则保持原样，命名冲突不作为额外的参数校验异常。
+
+这项决定将 2026-09-09 发现的子命名空间清理误删记录为**已接受的设计限制**，保留现有运行行为。是否触发取决于具体命名和 `clear` 调用，不以未经统计的“低概率”作为保证。历史发现及最小复现保留在 [测试说明与检查记录](testing.md)；`KeyNamingLimitationTest` 随普通集成测试记录两种实现的现有差异，不将冲突场景视为共同隔离契约的通过项。
+
+原检查还发现普通缓存可以占用计数前缀。根据 2026-09-10 的决定，此前缀属于调用方必须遵守的保留约定，不再作为待修复的隔离缺陷；未增加前缀校验或修改物理 key 格式。历史复现保留在 [测试说明与检查记录](testing.md)。
+
+## TTL 上限（2026-09-10）
+
+`Cache` 与 `Counter` 的最大 TTL 统一为 `Duration.ofSeconds(Integer.MAX_VALUE)`，即 `2_147_483_647_000` 毫秒，约 68 年，与现有 `int ttlSeconds` 重载范围对齐。上限本身合法，超过上限的 `Duration` 一律抛出 `IllegalArgumentException`，不静默减一或缩短有效期。
+
+四个实现及带 loader 的 `get` 使用公共参数校验，在读取、写入、续期或调用 loader 前拒绝超限值；已有计数的固定窗口更新也必须通过同一校验。先检查 `Duration` 的秒数与纳秒数范围，再用整数运算转换为毫秒，避免极大正负时长在转换中溢出；有效时长仍按毫秒精度执行。最大秒数下只接受零纳秒，保证超过上限 1 纳秒也被拒绝。
+
+这一决定取代本日先前的 Lua 反向恢复方案。`Long.MAX_VALUE` 毫秒及其减一等超限输入在 Java 中被拒绝，不再进入 Redis 修改计数；Lua 恢复原来的 3 个参数和 `INCRBY` 后按需续期的流程。合法 TTL 下，固定窗口命中仍保留原 TTL，计数溢出仍发生在 TTL 刷新之前。该限制解决极端 TTL 的时间点溢出，不增加 Redis 脚本通用回滚承诺。复现历史与验证方式见 [测试说明与检查记录](testing.md)。
 
 ## 暂不支持
 

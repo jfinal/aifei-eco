@@ -65,17 +65,22 @@ public final class CacheValidator {
     }
 
     /**
-     * 校验有效期并返回毫秒值。
+     * 校验有效期范围并返回毫秒值。
      */
     public static long requireTtl(Duration ttl) {
         if (ttl == null) {
             throw new IllegalArgumentException("ttl can not be null");
         }
-        long ttlMillis = ttl.toMillis();
-        if (ttlMillis <= 0) {
+        long seconds = ttl.getSeconds();
+        int nanos = ttl.getNano();
+        if (seconds < 0 || (seconds == 0 && nanos < 1_000_000)) {
             throw new IllegalArgumentException("ttl must be at least one millisecond");
         }
-        return ttlMillis;
+        if (seconds > Integer.MAX_VALUE || (seconds == Integer.MAX_VALUE && nanos > 0)) {
+            throw new IllegalArgumentException("ttl must not exceed " + Integer.MAX_VALUE + " seconds");
+        }
+        // 秒数已限制在非负 int 范围内，转换为毫秒不会溢出。
+        return seconds * 1000L + nanos / 1_000_000;
     }
 
     /**
