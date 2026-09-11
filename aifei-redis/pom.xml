@@ -59,6 +59,7 @@
             <groupId>cn.aifei</groupId>
             <artifactId>aifei</artifactId>
             <version>${aifei.version}</version>
+            <optional>true</optional>
         </dependency>
 
         <!-- redis 客户端 -->
