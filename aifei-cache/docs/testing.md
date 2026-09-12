@@ -330,7 +330,7 @@ cache.remove("_Aifei_Counter_:quota", "u1");
 - 已实际生成主 JAR、sources JAR、javadoc JAR；检查过主包的 class、sources 中的两个接口源码、Javadoc 中的两个接口页面。审计代码未被打入主包。
 - 生产 JAR 的 17 个 class 的 major version 均为 52。当前解析到的所有依赖的基础 class 版本均不高于 52；扫描排除了 `META-INF/versions/` 和 `module-info.class`。另以真实 JDK 8 执行了全部审计测试。
 - POM 中已包含项目名称、描述、URL、license、developers、SCM；发布 profile 中已有 GPG 插件和 Central 插件。
-- 只读访问 Maven Central：`cn.aifei:aifei:1.1.0` 与 `redis.clients:jedis:7.5.2` 的 POM 均为 HTTP 200；本次检查 `cn.aifei:aifei-cache:1.0` POM 为 HTTP 404。该结果只代表查询时点，不证明命名空间发布权限或没有其他待发布任务。
+- 只读访问 Maven Central：`cn.aifei:aifei:1.1.1` 与 `redis.clients:jedis:7.5.2` 的 POM 均为 HTTP 200；本次检查 `cn.aifei:aifei-cache:1.0` POM 为 HTTP 404。该结果只代表查询时点，不证明命名空间发布权限或没有其他待发布任务。
 - 已验证 Caffeine 场景移除 Jedis/Fury 后仍能从实际发布 JAR 运行并完成插件装配；自定义 Redis codec 场景移除 Caffeine/Fury 后仍可读写缓存和计数。
 - 未进行真实 GPG 签名、账号/命名空间授权验证、远端 staging 验证或上传发布。这些步骤不包含在本次构建成功的结论中。
 
