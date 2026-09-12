@@ -45,7 +45,7 @@ aifei-cache 是为 [aifei](https://aifei.cn) 提供的极简缓存与计数组�
 <dependency>
     <groupId>cn.aifei</groupId>
     <artifactId>aifei-cache</artifactId>
-    <version>1.0</version>
+    <version>1.1</version>
 </dependency>
 ```
 
