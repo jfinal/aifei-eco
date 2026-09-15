@@ -14,8 +14,6 @@
   <description>A standalone Maven demo project for aifei.</description>
 
   <properties>
-    <maven.compiler.source>1.8</maven.compiler.source>
-    <maven.compiler.target>1.8</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
@@ -86,10 +84,11 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.15.0</version>
+        <version>3.16.0</version>
         <configuration>
-          <source>1.8</source>
-          <target>1.8</target>
+          <release>8</release>
+          <source>8</source>
+          <target>8</target>
           <encoding>UTF-8</encoding>
           <!-- 保留方法参数名，用于运行时反射读取 -->
           <parameters>true</parameters>
