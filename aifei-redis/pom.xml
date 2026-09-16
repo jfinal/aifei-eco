@@ -37,7 +37,7 @@
     </scm>
 
     <properties>
-        <!-- 高版本 JDK 编译到 JDK 1.8 -->
+        <!-- 高版本 JDK 编译到 JDK 8 -->
         <maven.compiler.release>8</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
