@@ -38,10 +38,12 @@ public class AppConfig implements AifeiConfig<In, Out> {
         // 配置日志
         settings.setLogFactory(new Log4jLogFactory());
 
-        // 配置 Server、Dispatcher、Handler
-        settings.setServer(new UndertowServer(), new IoDispatcher())
-                // .addHandler(new CorsHandler())       // 支持跨域时放开这一行
-                .addHandler(new IoHandler(p.getBoolean("printAction")));
+        // 配置 Server、Dispatcher
+        settings.setServer(new UndertowServer(), new IoDispatcher());
+
+        // 配置 Handler
+        // settings.addHandler(new CorsHandler())       // 支持跨域时放开这一行
+        settings.addHandler(new IoHandler(p.getBoolean("printAction"), "view"));
 
         // 配置对象转 json 的默认日期格式
         JsonKit.get().setWriteDateFormat("yyyy-MM-dd HH:mm:ss");
