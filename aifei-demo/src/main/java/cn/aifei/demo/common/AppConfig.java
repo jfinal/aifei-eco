@@ -80,6 +80,7 @@ public class AppConfig implements AifeiConfig<In, Out> {
         dbPlugin.addModelSet(new ModelSet());       // 添加生成的 Model 集合
         dbPlugin.setPrintSql(true);                 // 配置 SQL 打印
         dbPlugin.setFormatSql(false);               // 配置 SQL 格式化
+        dbPlugin.getEngine().setCompressorOn(' ');  // 多行 SQL 压缩至一行（换行转换为空格）
         // dbPlugin.setPrintSqlToLog(true);         // 配置 SQL 打印到日志文件，便于找到慢 SQL 进行优化
         // dbPlugin.config(c -> c.setXxx(...));     // 通过 config 配置内部各组件
 
